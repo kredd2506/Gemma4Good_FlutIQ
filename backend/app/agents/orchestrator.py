@@ -22,6 +22,7 @@ from app.agents.fema_agent import run_fema_agent
 from app.agents.local_agent import run_local_agent
 from app.agents.news_agent import run_news_agent
 from app.agents.risk_agent import run_risk_agent
+from app.agents.streetview_agent import run_streetview_agent
 from app.agents.weather_agent import run_weather_agent
 from app.tools.geocoder import geocode_address
 
@@ -56,14 +57,33 @@ async def _archive(ctx: GeoCtx) -> dict:
     )
 
 
+# The streetview agent needs language for its summary copy. Curried in
+# at agent-pack-construction time below.
+def _make_streetview(language: str) -> AgentFn:
+    async def _run(ctx: GeoCtx) -> dict:
+        return await run_streetview_agent(
+            ctx["lat"], ctx["lon"], ctx.get("display_name", ""),
+            language=language,
+        )
+    return _run
+
+
 # Order here is the order the frontend renders agent rows in.
-DATA_AGENTS: dict[str, AgentFn] = {
-    "fema": _fema,
-    "local": _local,
-    "weather": _weather,
-    "news": _news,
-    "archive": _archive,
-}
+# streetview is the only multimodal one — placed last in the data row.
+def _data_agents_for(language: str) -> dict[str, AgentFn]:
+    return {
+        "fema": _fema,
+        "local": _local,
+        "weather": _weather,
+        "news": _news,
+        "archive": _archive,
+        "streetview": _make_streetview(language),
+    }
+
+
+# Static handle used by the frontend to enumerate agent ids before a
+# request fires (see AGENTS array in index.html).
+DATA_AGENTS: dict[str, AgentFn] = _data_agents_for("en")
 
 
 def sse(event: str, data: dict) -> str:
@@ -94,8 +114,12 @@ async def run_assessment(
         "county": geo.get("county", ""),
     })
 
+    # Build the data-agent pack with the request's language so the
+    # streetview agent's summary text matches the dossier language.
+    data_agents = _data_agents_for(language)
+
     # Announce all data agents up front so the UI can render rows.
-    for name in DATA_AGENTS:
+    for name in data_agents:
         yield sse("agent_update", {
             "agent": name,
             "status": "working",
@@ -113,7 +137,7 @@ async def run_assessment(
     })
 
     # Run data agents in parallel; stream results in completion order.
-    tasks = {name: asyncio.create_task(fn(ctx)) for name, fn in DATA_AGENTS.items()}
+    tasks = {name: asyncio.create_task(fn(ctx)) for name, fn in data_agents.items()}
     task_to_name = {t: n for n, t in tasks.items()}
     pending = set(tasks.values())
     results: dict[str, dict] = {}
@@ -203,6 +227,7 @@ def _compile_dossier(geo: GeoCtx, results: dict) -> dict:
         "weather": results.get("weather", {}),
         "news": results.get("news", {}),
         "archive": results.get("archive", {}),
+        "streetview": results.get("streetview", {}),
         "risk": results.get("risk", {}),
         "advisor": results.get("advisor", {}),
     }

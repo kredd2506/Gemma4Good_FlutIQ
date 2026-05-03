@@ -5,6 +5,7 @@ import os
 # paste flows (HF Spaces secrets UI adds a trailing \n which makes httpx
 # reject the Authorization header as an illegal value).
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
 MODEL_PRIMARY = "google/gemma-4-31b-it:free"

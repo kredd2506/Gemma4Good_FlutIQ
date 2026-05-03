@@ -540,6 +540,9 @@ const AGENTS = [
   { id: "archive", name: "Archivist",
     finding: "Cook County: 11 NOAA flood events in 10yr, 4 FEMA disaster declarations. 2008, 2013, 2020, 2023 caused widespread basement flooding.",
     pin: { x: 62, y: 70, label: "11 events / 10y", tone: "amber" }, delay: 1100 },
+  { id: "streetview", name: "Streetview surveyor",
+    finding: "Multimodal: feeding Google Street View imagery to Gemma 4 vision to spot ground-floor flood-risk indicators.",
+    pin: null, delay: 1800 },
   { id: "risk",    name: "Risk analyst",
     finding: "Synthesizing… Score 74/100. AEP ≈ 5.1%, 30-yr cumulative probability of basement flood ≈ 79%. FEMA gap material.",
     pin: null, delay: 1600 },
@@ -1108,6 +1111,7 @@ const mapDossier = (raw) => {
     mitigating_factors: risk.mitigating_factors || [],
     reasoning_trace: risk.reasoning_trace || "",
     advisor_tldr,
+    streetview: raw.streetview || {},
   };
 };
 
@@ -1201,8 +1205,63 @@ const DossierScreen = ({ onBack, dossier }) => {
           )}
         </Section>
 
+        {D.streetview?.available && (
+          <Section
+            num="§03"
+            icon={<Icon name="pin" color="var(--accent)" size={16}/>}
+            iconBg="var(--accent-soft)"
+            title="What we saw at the property"
+            badge={<span className="risk-tag purple">Gemma 4 vision</span>}>
+            <div style={{display:"grid", gridTemplateColumns:"260px 1fr", gap:18, alignItems:"start"}}>
+              <div>
+                <img
+                  src={D.streetview.image_data_url}
+                  alt="Google Street View of the property"
+                  style={{width:"100%", borderRadius:10, border:"1px solid var(--line)", display:"block"}}
+                />
+                <div style={{fontSize:11, color:"var(--ink-4)", marginTop:6, fontFamily:"'JetBrains Mono', monospace"}}>
+                  {D.streetview.copyright || "© Google"}
+                  {D.streetview.capture_date && ` · captured ${D.streetview.capture_date}`}
+                  {D.streetview.pano_distance_m != null && ` · ${D.streetview.pano_distance_m}m from address`}
+                </div>
+              </div>
+              <div>
+                <p style={{margin:"0 0 10px"}}>
+                  We fed this Street View frame to Gemma 4 with vision turned on
+                  and asked it to flag visible flood-risk indicators. The model
+                  was instructed not to fabricate features it couldn't actually see.
+                </p>
+                <div style={{display:"flex", gap:8, flexWrap:"wrap", marginBottom:12, fontSize:12}}>
+                  <span className={`risk-tag ${D.streetview.overall_visual_risk === "high" ? "coral" : D.streetview.overall_visual_risk === "moderate" ? "amber" : "teal"}`}>
+                    visual risk: {D.streetview.overall_visual_risk || "unclear"}
+                  </span>
+                  {D.streetview.elevation_vs_street && D.streetview.elevation_vs_street !== "unclear" && (
+                    <span className="risk-tag neutral">{D.streetview.elevation_vs_street.replace(/_/g, " ")}</span>
+                  )}
+                  <span className="risk-tag neutral">confidence: {D.streetview.confidence || "unknown"}</span>
+                </div>
+                {D.streetview.indicators?.length > 0 ? (
+                  <ul style={{margin:0, paddingLeft:16, fontSize:13, color:"var(--ink-2)", lineHeight:1.55}}>
+                    {D.streetview.indicators.map((ind, i) => (
+                      <li key={i} style={{marginBottom:8}}>
+                        <strong>{ind.feature}</strong>
+                        {ind.severity && <span className="small" style={{marginLeft:6}}> · {ind.severity}</span>}
+                        <div style={{color:"var(--ink-3)", fontSize:12, marginTop:2}}>{ind.risk_implication}</div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{color:"var(--ink-3)", fontSize:13, margin:0}}>
+                    {D.streetview.summary || "No specific indicators visible from the available angle."}
+                  </p>
+                )}
+              </div>
+            </div>
+          </Section>
+        )}
+
         <Section
-          num="§03"
+          num={D.streetview?.available ? "§04" : "§03"}
           icon={<Icon name="warn" color="var(--coral)" size={16}/>}
           iconBg="var(--coral-soft)"
           title="Why FEMA's flood map isn't the whole story"
@@ -1256,7 +1315,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num="§04"
+          num={D.streetview?.available ? "§05" : "§04"}
           icon={<Icon name="drop" color="var(--accent)" size={16}/>}
           iconBg="var(--accent-soft)"
           title="The raw signals we looked at"
@@ -1270,7 +1329,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num="§05"
+          num={D.streetview?.available ? "§06" : "§05"}
           icon={<Icon name="news" color="var(--amber)" size={16}/>}
           iconBg="var(--amber-soft)"
           title="Recent local flood news">
