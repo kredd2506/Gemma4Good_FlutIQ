@@ -75,7 +75,10 @@ def _err_summary(e: Exception) -> str:
     return f"Error: {msg[:140]}"
 
 
-async def run_assessment(address: str) -> AsyncGenerator[str, None]:
+async def run_assessment(
+    address: str,
+    language: str = "en",
+) -> AsyncGenerator[str, None]:
     geo = await geocode_address(address)
     if not geo:
         yield sse("error", {"message": f"Could not geocode address: {address!r}"})
@@ -143,7 +146,8 @@ async def run_assessment(address: str) -> AsyncGenerator[str, None]:
     })
     try:
         risk_result = await run_risk_agent(
-            results, geo["lat"], geo["lon"], geo["display_name"]
+            results, geo["lat"], geo["lon"], geo["display_name"],
+            language=language,
         )
         results["risk"] = risk_result
         yield sse("agent_update", {
@@ -167,7 +171,8 @@ async def run_assessment(address: str) -> AsyncGenerator[str, None]:
     })
     try:
         advisor_result = await run_advisor_agent(
-            {**results, "_geo": geo}, geo["display_name"]
+            {**results, "_geo": geo}, geo["display_name"],
+            language=language,
         )
         results["advisor"] = advisor_result
         yield sse("agent_update", {

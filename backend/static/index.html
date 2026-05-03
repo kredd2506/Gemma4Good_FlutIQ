@@ -397,6 +397,18 @@ const API_URL = (() => {
 
 // ── SSE hook ───────────────────────────────────────────────────────────────
 // Streams /api/assess. Surfaces per-agent status, geocode, dossier, errors.
+// Languages we support for the dossier. Mirrored from
+// backend/app/data/languages.py — keep in sync.
+const LANGUAGES = [
+  { code: "en", label: "English",        native: "English" },
+  { code: "es", label: "Spanish",        native: "Español" },
+  { code: "zh", label: "Mandarin",       native: "中文" },
+  { code: "vi", label: "Vietnamese",     native: "Tiếng Việt" },
+  { code: "ht", label: "Haitian Creole", native: "Kreyòl ayisyen" },
+  { code: "ar", label: "Arabic",         native: "العربية" },
+  { code: "tl", label: "Tagalog",        native: "Tagalog" },
+];
+
 const useFloodAssessment = () => {
   const [agentState, setAgentState] = useState({});  // {fema: {status, summary}, ...}
   const [geocode, setGeocode] = useState(null);
@@ -415,7 +427,7 @@ const useFloodAssessment = () => {
     setRunning(false);
   }, []);
 
-  const start = useCallback(async (address) => {
+  const start = useCallback(async (address, language = "en") => {
     reset();
     setRunning(true);
     const controller = new AbortController();
@@ -425,7 +437,7 @@ const useFloodAssessment = () => {
       const resp = await fetch(`${API_URL}/api/assess`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address, language }),
         signal: controller.signal,
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -798,17 +810,17 @@ const SearchScreen = ({ onSubmit }) => {
 };
 
 // ── AGENTS / MAP ───────────────────────────────────────────────────────────
-const AgentsScreen = ({ address, onComplete, dark }) => {
+const AgentsScreen = ({ address, language, onComplete, dark }) => {
   const startedAt = useRef(Date.now());
   const [now, setNow] = useState(Date.now());
   const { start, agentState, geocode, dossier, error, running } = useFloodAssessment();
 
   useEffect(() => {
-    start(address);
+    start(address, language || "en");
     const tickClock = setInterval(() => setNow(Date.now()), 100);
     return () => clearInterval(tickClock);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address]);
+  }, [address, language]);
 
   // Once the backend emits the full dossier, hand it up.
   useEffect(() => {
@@ -1288,7 +1300,7 @@ const DossierScreen = ({ onBack, dossier }) => {
 };
 
 // ── CHROME ─────────────────────────────────────────────────────────────────
-const Chrome = ({ screen, onJump, dark, onToggleDark }) => (
+const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange }) => (
   <div className="app-chrome">
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
@@ -1297,6 +1309,23 @@ const Chrome = ({ screen, onJump, dark, onToggleDark }) => (
     </div>
     <div className="chrome-meta">
       <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>
+      <select
+        value={language}
+        onChange={(e) => onLanguageChange(e.target.value)}
+        title="Dossier language"
+        aria-label="Dossier language"
+        style={{
+          height: 28, padding: "0 8px", border: "1px solid var(--line)",
+          borderRadius: 6, background: "var(--surface)", color: "var(--ink-2)",
+          fontSize: 12, fontFamily: "'JetBrains Mono', monospace", cursor: "pointer",
+        }}
+      >
+        {LANGUAGES.map(l => (
+          <option key={l.code} value={l.code}>
+            {l.code === "en" ? l.label : `${l.native} · ${l.label}`}
+          </option>
+        ))}
+      </select>
       <span className={"pill" + (screen === "search" ? " active" : "")} onClick={()=>onJump("search")}>search</span>
       <span className={"pill" + (screen === "agents" ? " active" : "")} onClick={()=>onJump("agents")}>agents</span>
       <span className={"pill" + (screen === "dossier" ? " active" : "")} onClick={()=>onJump("dossier")}>dossier</span>
@@ -1313,10 +1342,18 @@ const App = () => {
   const [address, setAddress] = useState("");
   const [liveDossier, setLiveDossier] = useState(null);
   const [dark, setDark] = useState(false);
+  const [language, setLanguage] = useState(() => {
+    try { return localStorage.getItem("flutiq.language") || "en"; }
+    catch { return "en"; }
+  });
 
   useEffect(() => {
     document.body.classList.toggle("dark", dark);
   }, [dark]);
+
+  useEffect(() => {
+    try { localStorage.setItem("flutiq.language", language); } catch {}
+  }, [language]);
 
   const handleSubmit = (addr) => {
     setAddress(addr);
@@ -1331,9 +1368,16 @@ const App = () => {
 
   return (
     <>
-      <Chrome screen={screen} onJump={setScreen} dark={dark} onToggleDark={() => setDark(d => !d)}/>
+      <Chrome
+        screen={screen}
+        onJump={setScreen}
+        dark={dark}
+        onToggleDark={() => setDark(d => !d)}
+        language={language}
+        onLanguageChange={setLanguage}
+      />
       {screen === "search"  && <SearchScreen onSubmit={handleSubmit}/>}
-      {screen === "agents"  && <AgentsScreen address={address} dark={dark} onComplete={handleAgentsComplete} />}
+      {screen === "agents"  && <AgentsScreen address={address} language={language} dark={dark} onComplete={handleAgentsComplete} />}
       {screen === "dossier" && <DossierScreen onBack={()=>setScreen("search")} dossier={liveDossier} />}
     </>
   );

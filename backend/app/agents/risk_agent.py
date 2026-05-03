@@ -6,6 +6,7 @@ preserved on the dossier for the writeup/demo.
 """
 import json
 
+from app.data.languages import prompt_directive
 from app.llm.client import (
     call_gemma4,
     extract_reasoning,
@@ -20,6 +21,7 @@ async def run_risk_agent(
     lat: float,
     lon: float,
     address: str,
+    language: str = "en",
 ) -> dict:
     user_prompt = f"""You are analyzing flood risk for: {address} ({lat}, {lon})
 
@@ -69,7 +71,7 @@ Think step by step. Show your reasoning. Return ONLY the JSON object at the end.
 
     response = await call_gemma4(
         messages=[
-            {"role": "system", "content": RISK_AGENT_SYSTEM_PROMPT},
+            {"role": "system", "content": RISK_AGENT_SYSTEM_PROMPT + prompt_directive(language)},
             {"role": "user", "content": user_prompt},
         ],
         reasoning=True,

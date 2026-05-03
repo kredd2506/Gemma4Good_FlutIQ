@@ -11,6 +11,7 @@ from app.data.insurance_catalog import (
     products_available_in,
     resources_for_city,
 )
+from app.data.languages import prompt_directive
 from app.llm.client import call_gemma4, extract_text, parse_json_response
 from app.llm.prompts import ADVISOR_AGENT_SYSTEM_PROMPT
 
@@ -35,7 +36,11 @@ _STATE_TO_CODE = {
 }
 
 
-async def run_advisor_agent(all_data: dict, address: str) -> dict:
+async def run_advisor_agent(
+    all_data: dict,
+    address: str,
+    language: str = "en",
+) -> dict:
     risk = all_data.get("risk", {}) or {}
     fema = all_data.get("fema", {}) or {}
     local = all_data.get("local", {}) or {}
@@ -121,7 +126,7 @@ Do not invent prices or company names. Return ONLY the JSON object."""
 
     response = await call_gemma4(
         messages=[
-            {"role": "system", "content": ADVISOR_AGENT_SYSTEM_PROMPT},
+            {"role": "system", "content": ADVISOR_AGENT_SYSTEM_PROMPT + prompt_directive(language)},
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.3,
