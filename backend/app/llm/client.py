@@ -105,6 +105,16 @@ async def call_gemma4(
                 backoff *= 2
                 continue
 
+            # Transient upstream errors (502/503/504 are common when an
+            # OpenRouter provider hiccups). Retry with backoff before
+            # surfacing to the user as an agent error.
+            if resp.status_code in (500, 502, 503, 504):
+                if attempt >= retries:
+                    resp.raise_for_status()
+                await asyncio.sleep(backoff)
+                backoff *= 2
+                continue
+
             resp.raise_for_status()
             return resp.json()
 
