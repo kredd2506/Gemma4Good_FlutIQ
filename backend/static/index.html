@@ -1112,8 +1112,10 @@ const mapDossier = (raw) => {
     reasoning_trace: risk.reasoning_trace || "",
     visual_corroboration: risk.visual_corroboration || "",
     used_streetview_image: !!risk.used_streetview_image,
+    images_used: risk.images_used || [],
     advisor_tldr,
     streetview: raw.streetview || {},
+    maps: raw.maps || {},
   };
 };
 
@@ -1121,6 +1123,7 @@ const DossierScreen = ({ onBack, dossier }) => {
   const D = useMemo(() => mapDossier(dossier), [dossier]);
   const [showReasoning, setShowReasoning] = useState(false);
   const [showBoxes, setShowBoxes] = useState(true);
+  const [imageTab, setImageTab] = useState("streetview");  // "streetview" | "satellite" | "topo"
   return (
     <div className="screen dossier-wrap">
       <div className="dossier">
@@ -1208,7 +1211,24 @@ const DossierScreen = ({ onBack, dossier }) => {
           )}
         </Section>
 
-        {D.streetview?.available && (
+        {(D.streetview?.available || D.maps?.satellite || D.maps?.topo) && (() => {
+          const tabs = [
+            D.streetview?.available && {key:"streetview", label:"Street level", source:"Google"},
+            D.maps?.satellite       && {key:"satellite",  label:"Satellite",    source:"Mapbox"},
+            D.maps?.topo            && {key:"topo",       label:"Wider area",   source:"Mapbox"},
+          ].filter(Boolean);
+          // Auto-correct selection if current tab isn't available.
+          const activeKey = tabs.find(t => t.key === imageTab) ? imageTab : tabs[0]?.key;
+          const activeSrc = activeKey === "streetview" ? D.streetview.image_data_url
+                         : activeKey === "satellite"  ? D.maps.satellite.data_url
+                         : activeKey === "topo"       ? D.maps.topo.data_url
+                         : null;
+          const activeAlt = activeKey === "streetview" ? "Google Street View of the property"
+                         : activeKey === "satellite"  ? "Mapbox satellite view of the property"
+                         : activeKey === "topo"       ? "Mapbox wider-area context map of the property"
+                         : "";
+          const showOverlay = activeKey === "streetview" && showBoxes && D.streetview.indicators?.some(i => i.box_2d);
+        return (
           <Section
             num="§03"
             icon={<Icon name="pin" color="var(--accent)" size={16}/>}
@@ -1217,13 +1237,34 @@ const DossierScreen = ({ onBack, dossier }) => {
             badge={<span className="risk-tag purple">Gemma 4 vision</span>}>
             <div style={{display:"grid", gridTemplateColumns:"320px 1fr", gap:18, alignItems:"start"}}>
               <div>
+                {tabs.length > 1 && (
+                  <div style={{display:"flex", gap:6, marginBottom:8}}>
+                    {tabs.map(t => (
+                      <button
+                        key={t.key}
+                        onClick={() => setImageTab(t.key)}
+                        style={{
+                          flex:1, padding:"6px 8px", fontSize:11,
+                          fontFamily:"'JetBrains Mono', monospace",
+                          letterSpacing:"0.04em", textTransform:"uppercase",
+                          background: activeKey === t.key ? "var(--accent-soft)" : "transparent",
+                          color: activeKey === t.key ? "var(--accent)" : "var(--ink-3)",
+                          border: `1px solid ${activeKey === t.key ? "var(--accent)" : "var(--line)"}`,
+                          borderRadius:6, cursor:"pointer",
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div style={{position:"relative", borderRadius:10, overflow:"hidden", border:"1px solid var(--line)", lineHeight:0}}>
                   <img
-                    src={D.streetview.image_data_url}
-                    alt="Google Street View of the property"
+                    src={activeSrc}
+                    alt={activeAlt}
                     style={{width:"100%", display:"block"}}
                   />
-                  {showBoxes && D.streetview.indicators?.some(i => i.box_2d) && (
+                  {showOverlay && (
                     <svg
                       viewBox="0 0 1000 1000"
                       preserveAspectRatio="none"
@@ -1238,9 +1279,8 @@ const DossierScreen = ({ onBack, dossier }) => {
                                     : sev === "low" ? "#0F8A6A"
                                     : "#2B6FD4";
                         const labelText = `${i+1}. ${ind.feature || "indicator"}`;
-                        // SVG text has no native background; we put a rect behind it.
-                        const labelWidthEstimate = labelText.length * 11 + 12; // rough px estimate at scale
-                        const labelY = y1 > 50 ? y1 - 8 : y2 + 32; // above if room, else below
+                        const labelWidthEstimate = labelText.length * 11 + 12;
+                        const labelY = y1 > 50 ? y1 - 8 : y2 + 32;
                         return (
                           <g key={i}>
                             <rect
@@ -1273,7 +1313,7 @@ const DossierScreen = ({ onBack, dossier }) => {
                     </svg>
                   )}
                 </div>
-                {D.streetview.indicators?.some(i => i.box_2d) && (
+                {activeKey === "streetview" && D.streetview.indicators?.some(i => i.box_2d) && (
                   <button
                     onClick={() => setShowBoxes(s => !s)}
                     style={{
@@ -1287,9 +1327,18 @@ const DossierScreen = ({ onBack, dossier }) => {
                   </button>
                 )}
                 <div style={{fontSize:11, color:"var(--ink-4)", marginTop:6, fontFamily:"'JetBrains Mono', monospace"}}>
-                  {D.streetview.copyright || "© Google"}
-                  {D.streetview.capture_date && ` · captured ${D.streetview.capture_date}`}
-                  {D.streetview.pano_distance_m != null && ` · ${D.streetview.pano_distance_m}m from address`}
+                  {activeKey === "streetview" && (
+                    <>{D.streetview.copyright || "© Google"}
+                      {D.streetview.capture_date && ` · captured ${D.streetview.capture_date}`}
+                      {D.streetview.pano_distance_m != null && ` · ${D.streetview.pano_distance_m}m from address`}
+                    </>
+                  )}
+                  {activeKey === "satellite" && (
+                    <>© Mapbox · © OpenStreetMap · zoom {D.maps.satellite.zoom}</>
+                  )}
+                  {activeKey === "topo" && (
+                    <>© Mapbox · © OpenStreetMap · zoom {D.maps.topo.zoom}</>
+                  )}
                 </div>
               </div>
               <div>
@@ -1341,10 +1390,11 @@ const DossierScreen = ({ onBack, dossier }) => {
               </div>
             </div>
           </Section>
-        )}
+        );
+        })()}
 
         <Section
-          num={D.streetview?.available ? "§04" : "§03"}
+          num={(D.streetview?.available || D.maps?.satellite || D.maps?.topo) ? "§04" : "§03"}
           icon={<Icon name="warn" color="var(--coral)" size={16}/>}
           iconBg="var(--coral-soft)"
           title="Why FEMA's flood map isn't the whole story"
@@ -1382,11 +1432,19 @@ const DossierScreen = ({ onBack, dossier }) => {
               )}
             </div>
           )}
-          {(D.visual_corroboration || D.used_streetview_image) && (
+          {(D.visual_corroboration || D.used_streetview_image || (D.images_used && D.images_used.length > 0)) && (() => {
+            const _imgLabel = {streetview: "street view", satellite: "satellite", topo: "wider-area map"};
+            const usedImages = (D.images_used || []).map(k => _imgLabel[k] || k);
+            const imgPart = usedImages.length === 0
+              ? "no images"
+              : usedImages.length === 1
+                ? `${usedImages[0]} image`
+                : `${usedImages.length} images (${usedImages.join(" + ")})`;
+            return (
             <div style={{marginTop: 18, padding: "14px 16px", background: "linear-gradient(135deg, rgba(110,95,216,0.08), rgba(43,111,212,0.06))", border: "1px solid rgba(110,95,216,0.25)", borderRadius: 10}}>
-              <div style={{display:"flex", alignItems:"center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--purple)", marginBottom: 8}}>
+              <div style={{display:"flex", alignItems:"center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--purple)", marginBottom: 8, flexWrap:"wrap"}}>
                 <span>◆ Gemma 4 multimodal reasoning</span>
-                <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· image + 6 data sources + chain-of-thought · one inference call</span>
+                <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· {imgPart} + 6 data sources + chain-of-thought · one inference call</span>
               </div>
               {D.visual_corroboration ? (
                 <p style={{margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--ink)"}}>
@@ -1394,11 +1452,12 @@ const DossierScreen = ({ onBack, dossier }) => {
                 </p>
               ) : (
                 <p style={{margin: 0, fontSize: 13, color: "var(--ink-3)"}}>
-                  The risk analyst received the Street View photograph and reasoned about it directly alongside the data — see the trace below.
+                  The risk analyst received {imgPart} and reasoned about them directly alongside the data — see the trace below.
                 </p>
               )}
             </div>
-          )}
+            );
+          })()}
           {D.reasoning_trace && (
             <div style={{marginTop: 12, padding: "12px 14px", background: "rgba(110,95,216,0.06)", border: "1px solid rgba(110,95,216,0.2)", borderRadius: 10}}>
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer"}} onClick={() => setShowReasoning(s => !s)}>
@@ -1415,7 +1474,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num={D.streetview?.available ? "§05" : "§04"}
+          num={(D.streetview?.available || D.maps?.satellite || D.maps?.topo) ? "§05" : "§04"}
           icon={<Icon name="drop" color="var(--accent)" size={16}/>}
           iconBg="var(--accent-soft)"
           title="The raw signals we looked at"
@@ -1429,7 +1488,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num={D.streetview?.available ? "§06" : "§05"}
+          num={(D.streetview?.available || D.maps?.satellite || D.maps?.topo) ? "§06" : "§05"}
           icon={<Icon name="news" color="var(--amber)" size={16}/>}
           iconBg="var(--amber-soft)"
           title="Recent local flood news">
@@ -1464,7 +1523,7 @@ const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
       <span>FlutIQ</span>
-      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.9 · beta</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.10 · beta</span>
     </div>
     <div className="chrome-meta">
       <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>

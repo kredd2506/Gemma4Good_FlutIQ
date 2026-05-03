@@ -40,30 +40,70 @@ async def run_risk_agent(
     address: str,
     language: str = "en",
     streetview_image_data_url: Optional[str] = None,
+    satellite_image_data_url: Optional[str] = None,
+    topo_image_data_url: Optional[str] = None,
 ) -> dict:
-    has_image = bool(streetview_image_data_url)
+    image_data_urls = [
+        ("satellite", satellite_image_data_url),
+        ("topo",      topo_image_data_url),
+        ("streetview", streetview_image_data_url),
+    ]
+    image_data_urls = [(k, u) for k, u in image_data_urls if u]
+    image_count = len(image_data_urls)
+    image_kinds = [k for k, _ in image_data_urls]
+    has_image = image_count > 0
 
     image_section = ""
     if has_image:
-        image_section = """
-## Property photograph (Street View)
-A street-level photo of the property is included with this prompt
-(it appears immediately above this text). EXAMINE IT YOURSELF before
-reading the data sections. Look for:
-- Lot elevation relative to street grade (above, level, or below)
-- Basement-level windows, below-grade entries, sunken stairwells
-- Downspout connections (running into ground? into sewer? disconnected?)
-- Visible drainage infrastructure (French drains, catch basins, swales)
-- Ground-floor HVAC equipment, electrical panels, or utilities
-- Evidence of prior water damage (staining, erosion, repair patches)
-- Impervious surface coverage (concrete / asphalt vs. permeable ground)
-- Distance to obvious water features (canals, low-lying parks)
+        # Describe ONLY the images we actually have, in the order we
+        # send them. Order matches the content_parts list below so
+        # "first image" / "second image" references are accurate.
+        labels = []
+        descriptions = []
+        if "satellite" in image_kinds:
+            labels.append(f"image {len(labels)+1} = SATELLITE VIEW (bird's-eye)")
+            descriptions.append(
+                "- SATELLITE: estimate the impervious-surface percentage of the lot "
+                "and the surrounding block (concrete/asphalt vs vegetation), the "
+                "building-footprint-to-lot ratio, proximity to visible water bodies "
+                "or drainage channels, and how the surrounding properties are "
+                "surfaced (catchment effect)."
+            )
+        if "topo" in image_kinds:
+            labels.append(f"image {len(labels)+1} = WIDER-AREA CONTEXT MAP")
+            descriptions.append(
+                "- WIDER-AREA CONTEXT MAP: Mapbox outdoors style at a wider zoom. "
+                "Note that in dense urban areas this image typically does NOT show "
+                "elevation contour lines. What it DOES show: named waterways "
+                "(creeks, rivers, drainage channels — drawn in blue), parks and "
+                "green spaces (green), mapped retention basins or detention "
+                "ponds if any, named streets, and distance context to all of "
+                "the above. Use it to reason about drainage proximity and "
+                "regional context, NOT to claim micro-elevation observations "
+                "you can't actually see."
+            )
+        if "streetview" in image_kinds:
+            labels.append(f"image {len(labels)+1} = STREET VIEW (eye-level)")
+            descriptions.append(
+                "- STREET VIEW: lot elevation vs street grade, basement-level windows, "
+                "below-grade entries, downspout connections (to ground vs to sewer), "
+                "ground-floor HVAC/electrical, evidence of prior water damage, "
+                "impervious surfaces visible at eye level."
+            )
+        labels_block = "\n".join(f"  · {l}" for l in labels)
+        desc_block = "\n".join(descriptions)
+        image_section = f"""
+## Property images ({image_count} attached, in order above this text)
+{labels_block}
 
-You will get the Street View agent's text findings below in the
-'Street View Visual Analysis' section, but rely on YOUR OWN
-inspection of the photo as the primary source. If you see something
-the Street View agent missed, say so. If you disagree with its
-assessment, explain why based on what YOU see.
+EXAMINE EACH IMAGE YOURSELF before reading the data sections.
+{desc_block}
+
+Cross-reference what you see across the images. When evidence from
+one view corroborates or contradicts another view, OR when visual
+evidence corroborates or contradicts the data, say so explicitly in
+your reasoning. Reference images by name ("from the satellite I can
+see...", "the topo contours show...", "in the street view...").
 """
 
     text_prompt = f"""You are analyzing flood risk for: {address} ({lat}, {lon})
@@ -120,12 +160,13 @@ photo directly in your reasoning ("I can see ...", "The image shows ...")
 when relevant. Return ONLY the JSON object at the end."""
 
     # Build the user message content. Per Gemma 4 best practice,
-    # image content parts go BEFORE the text part.
+    # image content parts go BEFORE the text part. Order matches the
+    # 'image N' labels in the prompt.
     user_content: list = []
-    if has_image:
+    for _kind, url in image_data_urls:
         user_content.append({
             "type": "image_url",
-            "image_url": {"url": streetview_image_data_url},
+            "image_url": {"url": url},
         })
     user_content.append({"type": "text", "text": text_prompt})
 
@@ -149,7 +190,8 @@ when relevant. Return ONLY the JSON object at the end."""
     parsed = parse_json_response(text)
     if parsed:
         parsed["reasoning_trace"] = reasoning
-        parsed["used_streetview_image"] = has_image
+        parsed["used_streetview_image"] = "streetview" in image_kinds
+        parsed["images_used"] = image_kinds
         return parsed
 
     return {
@@ -158,5 +200,6 @@ when relevant. Return ONLY the JSON object at the end."""
         "summary": "Risk analysis returned non-JSON output; using fallback",
         "raw_response": text,
         "reasoning_trace": reasoning,
-        "used_streetview_image": has_image,
+        "used_streetview_image": "streetview" in image_kinds,
+        "images_used": image_kinds,
     }
