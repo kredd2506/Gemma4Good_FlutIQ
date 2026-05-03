@@ -1,4 +1,4 @@
-"""System prompts for each FloodIQ agent."""
+"""System prompts for each FlutIQ agent."""
 
 FEMA_AGENT_SYSTEM_PROMPT = """You are a FEMA flood zone expert. Your job is to interpret FEMA National Flood Hazard Layer data and explain what it means for a property owner.
 

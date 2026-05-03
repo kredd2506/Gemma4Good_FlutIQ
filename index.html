@@ -372,10 +372,10 @@
 <script type="text/babel">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-// Backend URL. Override at runtime via window.FLOODIQ_API or query string ?api=...
+// Backend URL. Override at runtime via window.FLUTIQ_API or query string ?api=...
 const API_URL = (() => {
   const fromQuery = new URLSearchParams(window.location.search).get("api");
-  return fromQuery || window.FLOODIQ_API || "http://127.0.0.1:8000";
+  return fromQuery || window.FLUTIQ_API || "http://127.0.0.1:8000";
 })();
 
 // ── SSE hook ───────────────────────────────────────────────────────────────

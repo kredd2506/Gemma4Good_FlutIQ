@@ -1,6 +1,6 @@
 """
 Smoke test: confirm Gemma 4 free tier on OpenRouter supports
-the two features FloodIQ depends on:
+the two features FlutIQ depends on:
   1. reasoning mode (risk-analyst agent)
   2. OpenAI-format tool calling (data agents)
 
@@ -22,8 +22,8 @@ FALLBACK = "google/gemma-4-26b-a4b-it:free"
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://floodiq.pages.dev",
-    "X-Title": "FloodIQ smoke test",
+    "HTTP-Referer": "https://flutiq.pages.dev",
+    "X-Title": "FlutIQ smoke test",
 }
 
 

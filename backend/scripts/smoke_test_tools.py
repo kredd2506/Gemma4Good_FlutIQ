@@ -11,8 +11,8 @@ BASE = "https://openrouter.ai/api/v1/chat/completions"
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://floodiq.pages.dev",
-    "X-Title": "FloodIQ smoke test",
+    "HTTP-Referer": "https://flutiq.pages.dev",
+    "X-Title": "FlutIQ smoke test",
 }
 
 TOOLS = [{

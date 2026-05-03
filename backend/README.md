@@ -1,5 +1,5 @@
 ---
-title: FloodIQ API
+title: FlutIQ API
 emoji: 🌊
 colorFrom: blue
 colorTo: teal
@@ -8,4 +8,4 @@ app_port: 8000
 pinned: false
 ---
 
-FloodIQ backend — multi-agent flood risk assessment powered by Gemma 4.
+FlutIQ backend — multi-agent flood risk assessment powered by Gemma 4.

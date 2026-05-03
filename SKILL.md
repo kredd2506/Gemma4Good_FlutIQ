@@ -1,18 +1,18 @@
 ---
-name: floodiq
+name: flutiq
 description: >
-  FloodIQ is a multi-agent flood risk assessment app for the Gemma 4 Good Hackathon.
-  Use this skill whenever working on the FloodIQ project — building, debugging, or
+  FlutIQ is a multi-agent flood risk assessment app for the Gemma 4 Good Hackathon.
+  Use this skill whenever working on the FlutIQ project — building, debugging, or
   extending the React frontend, FastAPI backend, Gemma 4 agent system, data tool
   integrations, SSE streaming, deployment to Cloudflare Pages / HF Spaces, or
   preparing hackathon deliverables (video script, Kaggle writeup, README).
-  Trigger on any mention of FloodIQ, flood risk agents, FEMA gap analysis,
+  Trigger on any mention of FlutIQ, flood risk agents, FEMA gap analysis,
   Gemma 4 function calling, parametric insurance, or the hackathon submission.
 ---
 
-# FloodIQ Development Skill
+# FlutIQ Development Skill
 
-## What is FloodIQ
+## What is FlutIQ
 
 A multi-agent AI flood risk advisor. User enters a US address → 7 specialized Gemma 4 agents investigate in parallel → user receives a personalized "risk dossier" explaining their actual flood risk, what insurance they need, and what actions to take.
 

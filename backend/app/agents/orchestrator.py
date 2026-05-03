@@ -1,5 +1,5 @@
 """
-Runs all FloodIQ agents and yields SSE events to the client.
+Runs all FlutIQ agents and yields SSE events to the client.
 
 Flow:
   0. Geocode the address.
