@@ -168,10 +168,19 @@ async def run_assessment(
         "status": "working",
         "summary": "Synthesizing risk score with reasoning mode...",
     })
+    # If the streetview agent succeeded, hand its image to the risk
+    # analyst so the analyst can do its own visual reasoning instead
+    # of just reading another agent's text findings. v0.9 multimodal.
+    sv_image_data_url = None
+    sv_result = results.get("streetview") or {}
+    if sv_result.get("available"):
+        sv_image_data_url = sv_result.get("image_data_url")
+
     try:
         risk_result = await run_risk_agent(
             results, geo["lat"], geo["lon"], geo["display_name"],
             language=language,
+            streetview_image_data_url=sv_image_data_url,
         )
         results["risk"] = risk_result
         yield sse("agent_update", {

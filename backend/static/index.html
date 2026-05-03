@@ -1110,6 +1110,8 @@ const mapDossier = (raw) => {
     risk_factors: risk.key_risk_factors || [],
     mitigating_factors: risk.mitigating_factors || [],
     reasoning_trace: risk.reasoning_trace || "",
+    visual_corroboration: risk.visual_corroboration || "",
+    used_streetview_image: !!risk.used_streetview_image,
     advisor_tldr,
     streetview: raw.streetview || {},
   };
@@ -1380,8 +1382,25 @@ const DossierScreen = ({ onBack, dossier }) => {
               )}
             </div>
           )}
+          {(D.visual_corroboration || D.used_streetview_image) && (
+            <div style={{marginTop: 18, padding: "14px 16px", background: "linear-gradient(135deg, rgba(110,95,216,0.08), rgba(43,111,212,0.06))", border: "1px solid rgba(110,95,216,0.25)", borderRadius: 10}}>
+              <div style={{display:"flex", alignItems:"center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--purple)", marginBottom: 8}}>
+                <span>◆ Gemma 4 multimodal reasoning</span>
+                <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· image + 6 data sources + chain-of-thought · one inference call</span>
+              </div>
+              {D.visual_corroboration ? (
+                <p style={{margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--ink)"}}>
+                  <em>{D.visual_corroboration}</em>
+                </p>
+              ) : (
+                <p style={{margin: 0, fontSize: 13, color: "var(--ink-3)"}}>
+                  The risk analyst received the Street View photograph and reasoned about it directly alongside the data — see the trace below.
+                </p>
+              )}
+            </div>
+          )}
           {D.reasoning_trace && (
-            <div style={{marginTop: 18, padding: "12px 14px", background: "rgba(110,95,216,0.06)", border: "1px solid rgba(110,95,216,0.2)", borderRadius: 10}}>
+            <div style={{marginTop: 12, padding: "12px 14px", background: "rgba(110,95,216,0.06)", border: "1px solid rgba(110,95,216,0.2)", borderRadius: 10}}>
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer"}} onClick={() => setShowReasoning(s => !s)}>
                 <div style={{display:"flex", alignItems:"center", gap: 8, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--purple)"}}>
                   <span>◆ Gemma 4 reasoning trace</span>
@@ -1445,7 +1464,7 @@ const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
       <span>FlutIQ</span>
-      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.8 · beta</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.9 · beta</span>
     </div>
     <div className="chrome-meta">
       <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>
