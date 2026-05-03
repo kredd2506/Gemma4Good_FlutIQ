@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.assess import router as assess_router
 from app.api.health import router as health_router
 
-app = FastAPI(title="FlutIQ", version="0.7.0")
+app = FastAPI(title="FlutIQ", version="0.8.0")
 
 # CORS still permissive for split-deployment scenarios. With the
 # bundled deploy (frontend served from FastAPI) it's a no-op because

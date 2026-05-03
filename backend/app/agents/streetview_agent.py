@@ -13,19 +13,25 @@ Verified to work on the :free tier with BYOK in scripts/smoke_test_vision.py.
 Returns the verdict alongside the image (data URL) so the dossier UI
 can show a thumbnail next to the findings.
 """
-import json
-
 from app.data.languages import prompt_directive
 from app.llm.client import call_gemma4, extract_text, parse_json_response
 from app.tools.streetview import fetch_streetview_for
 
 
-SYSTEM_PROMPT = """You are a flood-risk surveyor analyzing a street-level photograph of a residential or small-commercial property. Your job is to identify visible features in the image that affect flood vulnerability.
+SYSTEM_PROMPT = """You are a flood-risk surveyor analyzing a street-level photograph of a residential or small-commercial property. Your job is to identify visible features in the image that affect flood vulnerability AND localize each one with a 2D bounding box.
 
 Critical rules:
 - Only describe features you can actually see. NEVER fabricate a feature to fill the JSON.
-- If the image is partially obstructed, low quality, or doesn't show the property clearly, say so via "confidence": "low" and a short summary explaining what's missing.
+- If the image is partially obstructed, low quality, or doesn't show the property clearly, say so via "confidence": "low" and a short summary explaining what's missing. Return indicators=[] in that case rather than guessing.
 - Distinguish "I see X and it implies Y" from "I'd want to verify Y by looking inside."
+- For every indicator you do return, include a tight bounding box around just that feature.
+
+Bounding box format (this is the Gemini 2 vision convention — follow it exactly):
+- Field name: "box_2d"
+- Order: [y_min, x_min, y_max, x_max]
+- Coordinates are NORMALIZED to a 0-1000 grid where (0, 0) is the top-left of the image and (1000, 1000) is the bottom-right.
+- y is the vertical axis (top to bottom). x is the horizontal axis (left to right).
+- Example: a feature in the top-left quarter of the image might be [120, 80, 480, 420].
 
 What to look for, in plain language:
 - Basement-level windows (small, below sidewalk level, sometimes with metal grating) — vulnerable to surface water entering directly
@@ -64,14 +70,15 @@ The photo was captured by Google Street View in {sv.get('capture_date') or 'an u
 approximately ({sv.get('pano_lat'):.5f}, {sv.get('pano_lon'):.5f})
 {f"— {sv.get('radius_m')}m from the geocoded address" if sv.get('radius_m') else "— at the geocoded address"}.
 
-Identify visible flood-risk indicators. Return a JSON object with:
+Identify visible flood-risk indicators AND draw a tight bounding box around each one. Return a JSON object with:
 {{
   "indicators": [
     {{
       "feature": "<short name, e.g. 'basement-level windows'>",
       "location_in_image": "<e.g. 'lower-left of the building facade'>",
       "risk_implication": "<1 sentence on what this means for flood risk>",
-      "severity": "low" | "moderate" | "high"
+      "severity": "low" | "moderate" | "high",
+      "box_2d": [y_min, x_min, y_max, x_max]   // normalized 0-1000, see system prompt
     }}
   ],
   "property_visible": true | false,
@@ -101,6 +108,28 @@ Return ONLY the JSON object."""
 
     text = extract_text(response)
     parsed = parse_json_response(text) or {}
+
+    # Validate per-indicator bounding boxes. Drop any box_2d that isn't
+    # a valid 4-tuple of numbers in [0, 1000]. The frontend trusts that
+    # every box on a passed-through indicator is renderable as-is.
+    cleaned_indicators = []
+    for ind in parsed.get("indicators") or []:
+        if not isinstance(ind, dict):
+            continue
+        box = ind.get("box_2d")
+        if (
+            isinstance(box, (list, tuple))
+            and len(box) == 4
+            and all(isinstance(v, (int, float)) for v in box)
+            and all(0 <= v <= 1000 for v in box)
+            and box[0] < box[2] and box[1] < box[3]  # ymin<ymax, xmin<xmax
+        ):
+            ind["box_2d"] = [float(v) for v in box]
+        else:
+            ind.pop("box_2d", None)  # keep indicator, drop bad box
+        cleaned_indicators.append(ind)
+    if cleaned_indicators:
+        parsed["indicators"] = cleaned_indicators
 
     # Always attach the image data URL + provenance so the UI can render
     # the thumbnail and credit Google for the imagery.
