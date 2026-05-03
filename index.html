@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>FlutIQ — flood risk advisor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F6F4EE;
+    --surface: #FFFFFF;
+    --ink: #161616;
+    --ink-2: #3A3A3A;
+    --ink-3: #6B7280;
+    --ink-4: #9CA3AF;
+    --line: rgba(22,22,22,0.10);
+    --line-2: rgba(22,22,22,0.06);
+    --accent: #2B6FD4;
+    --accent-2: #6FA8DD;
+    --accent-soft: #E6EFF8;
+    --teal: #0F8A6A;
+    --teal-soft: #DDF1E9;
+    --amber: #D4881E;
+    --amber-soft: #FAEED4;
+    --coral: #EE6A3D;
+    --coral-soft: #FCE2D5;
+    --purple: #6E5FD8;
+    --purple-soft: #ECE9F9;
+    --pink: #E84F86;
+    --pink-soft: #FCE2EB;
+    --lemon: #F2D24A;
+    --lemon-soft: #FBF1C7;
+    --map-bg: #EAF1F0;
+    --map-water: #BFD7E8;
+    --map-park: #D4E5C8;
+    --map-road: #F8F5EE;
+    --map-stroke: rgba(22,22,22,0.14);
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(700px 500px at 6% 8%, rgba(43,111,212,0.05), transparent 60%),
+      radial-gradient(600px 420px at 96% 92%, rgba(15,138,106,0.05), transparent 60%);
+  }
+  body.dark::before {
+    background:
+      radial-gradient(700px 500px at 6% 8%, rgba(111,168,221,0.10), transparent 60%),
+      radial-gradient(600px 420px at 96% 92%, rgba(79,184,154,0.10), transparent 60%);
+  }
+  #app { position: relative; z-index: 1; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { min-height: 100vh; }
+  ::selection { background: var(--accent); color: #fff; }
+  button { font-family: inherit; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: "ss01"; }
+  .serif { font-family: 'Instrument Serif', Georgia, serif; }
+
+  #app { min-height: 100vh; display: flex; flex-direction: column; }
+  .app-chrome {
+    height: 52px;
+    border-bottom: 0.5px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .wordmark { display: flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: -0.01em; }
+  .wordmark .glyph {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 25%, #9CC9FF 0%, var(--accent) 55%, #1A4FA0 100%);
+    box-shadow: inset 0 -4px 6px rgba(0,0,0,0.18), 0 2px 6px rgba(43,111,212,0.35);
+    display: grid; place-items: center; color: #fff;
+    font-family: 'Instrument Serif', serif; font-size: 14px; font-style: italic; font-weight: 500;
+    position: relative;
+    animation: bob 4s ease-in-out infinite;
+  }
+  .wordmark .glyph::after {
+    content: ""; position: absolute; top: 4px; left: 6px;
+    width: 6px; height: 4px; border-radius: 50%;
+    background: rgba(255,255,255,0.85); filter: blur(0.4px);
+  }
+  @keyframes bob { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-2px) rotate(2deg); } }
+  .chrome-meta { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--ink-3); }
+  .chrome-meta .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border: 0.5px solid var(--line); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
+  .chrome-meta .pill.static { cursor: default; }
+  .chrome-meta .pill.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .chrome-meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+  .chrome-meta .icon-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; border: 0.5px solid var(--line); background: var(--surface); color: var(--ink-3); cursor: pointer; }
+  .chrome-meta .icon-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+
+  .screen { animation: fade 320ms ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes pulseSoft { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  @keyframes barFill { from { width: 0; } }
+
+  .search-wrap { flex: 1; display: grid; place-items: center; padding: 64px 24px 96px; position: relative; }
+  .search-card { width: 100%; max-width: 720px; position: relative; z-index: 2; }
+
+  .mascot-cluster { position: absolute; pointer-events: none; }
+  .mascot-cluster.tl { top: 80px; left: 8%; }
+  .mascot-cluster.tr { top: 120px; right: 6%; }
+  .mascot-cluster.br { bottom: 60px; right: 12%; }
+  .droplet {
+    width: 44px; height: 56px;
+    background: radial-gradient(circle at 32% 28%, #BCDBFF 0%, var(--accent) 55%, #1A4FA0 100%);
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    transform: rotate(-8deg);
+    box-shadow: inset 0 -8px 10px rgba(0,0,0,0.18), 0 8px 22px rgba(43,111,212,0.28);
+    position: relative;
+    animation: floaty 6s ease-in-out infinite;
+  }
+  .droplet::before {
+    content: ""; position: absolute; top: 8px; left: 10px;
+    width: 10px; height: 14px; border-radius: 50%;
+    background: rgba(255,255,255,0.7); filter: blur(0.5px);
+    transform: rotate(-15deg);
+  }
+  .droplet .eyes { position: absolute; bottom: 16px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; }
+  .droplet .eye { width: 5px; height: 7px; border-radius: 50%; background: #1A1F2E; animation: blink 5s infinite; }
+  .droplet .smile { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 10px; height: 5px; border-bottom: 1.5px solid #1A1F2E; border-radius: 0 0 50% 50%; }
+  .droplet.sm { transform: rotate(-8deg) scale(0.55); animation-delay: -1.5s; }
+  .droplet.xs { transform: rotate(8deg) scale(0.4); animation-delay: -3s; }
+  @keyframes floaty { 0%,100% { translate: 0 0; } 50% { translate: 0 -10px; } }
+  @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+
+  .sparkle { position: absolute; width: 10px; height: 10px; opacity: 0.85; animation: twinkle 2.4s ease-in-out infinite; }
+  .sparkle::before, .sparkle::after { content: ""; position: absolute; inset: 0; background: var(--accent); border-radius: 50%; }
+  .sparkle::before { transform: scaleY(0.18); }
+  .sparkle::after  { transform: scaleX(0.18); }
+  .sparkle.s2 { background: transparent; animation-delay: -1.2s; }
+  .sparkle.s2::before, .sparkle.s2::after { background: var(--pink); }
+  .sparkle.s3::before, .sparkle.s3::after { background: var(--lemon); }
+  @keyframes twinkle { 0%,100% { transform: scale(0.4); opacity: 0; } 50% { transform: scale(1); opacity: 1; } }
+
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+  .eyebrow::before { content: ""; width: 18px; height: 1px; background: var(--ink-4); }
+  h1.lede { font-size: 64px; line-height: 1.02; letter-spacing: -0.035em; font-weight: 400; margin: 18px 0 0; font-family: 'Instrument Serif', serif; }
+  h1.lede em { font-style: italic; color: var(--accent); }
+  .lede-sub { margin: 22px 0 0; font-size: 17px; line-height: 1.55; color: var(--ink-2); max-width: 560px; }
+  .search-input-row { margin-top: 36px; position: relative; }
+  .search-input { width: 100%; height: 68px; padding: 0 160px 0 56px; border: 1px solid var(--line); background: var(--surface); border-radius: 18px; font-size: 16px; font-family: inherit; color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 5px var(--accent-soft), 0 12px 30px rgba(43,111,212,0.10); transform: translateY(-1px); }
+  .search-icon { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); color: var(--ink-3); }
+  .search-submit {
+    position: absolute; right: 8px; top: 8px; bottom: 8px; padding: 0 20px;
+    background: linear-gradient(135deg, var(--accent) 0%, #1A4FA0 100%);
+    color: #fff; border: 0; border-radius: 12px;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .12s, box-shadow .12s;
+    box-shadow: 0 4px 14px rgba(43,111,212,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .search-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(43,111,212,0.45), inset 0 1px 0 rgba(255,255,255,0.25); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip { font-size: 12.5px; padding: 8px 13px; border: 0.5px solid var(--line); background: var(--surface); border-radius: 999px; color: var(--ink-2); cursor: pointer; transition: border-color .15s, color .15s, background .15s, transform .15s; font-family: inherit; }
+  .chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translateY(-1px) rotate(-1deg); }
+  .chip .mono { color: var(--ink-4); margin-left: 6px; font-size: 11px; }
+
+  .learn-more { margin-top: 40px; font-size: 13px; color: var(--ink-3); }
+  .learn-more summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; user-select: none; }
+  .learn-more summary::-webkit-details-marker { display: none; }
+  .learn-more summary::before { content: "+"; font-family: 'JetBrains Mono', monospace; color: var(--ink-4); width: 14px; display: inline-block; }
+  .learn-more[open] summary::before { content: "−"; }
+  .learn-body { margin-top: 12px; padding-left: 14px; max-width: 520px; }
+  .learn-body p { margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+  .learn-sources { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); letter-spacing: 0.04em; }
+
+  .agents-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    min-height: calc(100vh - 52px);
+  }
+  .agents-side {
+    border-right: 0.5px solid var(--line);
+    background: var(--surface);
+    padding: 28px 28px 24px;
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .agents-target { font-size: 12px; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+  .agents-addr { margin-top: 6px; font-size: 22px; line-height: 1.18; letter-spacing: -0.02em; font-weight: 500; }
+  .progress-track { margin-top: 18px; height: 3px; background: var(--line-2); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); transition: width 600ms cubic-bezier(.4,0,.2,1); }
+  .progress-meta { margin-top: 8px; display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; }
+
+  .agent-list { margin-top: 22px; display: flex; flex-direction: column; gap: 0; }
+  .agent-item { padding: 14px 0; border-bottom: 0.5px solid var(--line-2); }
+  .agent-item:last-child { border-bottom: 0; }
+  .agent-head { display: flex; align-items: center; gap: 10px; }
+  .agent-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); flex-shrink: 0; }
+  .agent-dot.working { background: var(--accent); animation: pulseSoft 1.1s infinite; box-shadow: 0 0 0 4px var(--accent-soft); }
+  .agent-dot.done { background: var(--teal); }
+  .agent-name { font-size: 13.5px; font-weight: 500; flex: 1; }
+  .agent-status { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--ink-4); text-transform: uppercase; letter-spacing: 0.06em; }
+  .agent-status.working { color: var(--accent); }
+  .agent-status.done { color: var(--teal); }
+  .agent-finding { margin-top: 6px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; padding-left: 18px; }
+  .agent-finding .mono { color: var(--ink-3); font-size: 11.5px; }
+
+  .agents-foot { margin-top: auto; padding-top: 24px; font-size: 11px; color: var(--ink-4); font-family: 'JetBrains Mono', monospace; line-height: 1.6; }
+
+  .map-pane { position: relative; background: var(--map-bg); overflow: hidden; }
+  .map-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .map-overlay-tl { position: absolute; top: 20px; left: 20px; padding: 10px 14px; background: rgba(255,255,255,0.92); backdrop-filter: blur(6px); border: 0.5px solid var(--line); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); }
+  .map-overlay-tr { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .map-overlay-tr .legend { padding: 8px 12px; background: rgba(255,255,255,0.92); border: 0.5px solid var(--line); border-radius: 8px; font-size: 11px; }
+  .map-overlay-bl { position: absolute; bottom: 20px; left: 20px; padding: 10px 14px; background: rgba(255,255,255,0.92); border: 0.5px solid var(--line); border-radius: 8px; font-size: 11px; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; }
+  .map-pin { position: absolute; transform: translate(-50%, -100%); animation: pinDrop 360ms cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes pinDrop { 0% { opacity: 0; transform: translate(-50%, -130%) scale(.7); } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1); } }
+  .pin-bubble { padding: 7px 11px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; white-space: nowrap; box-shadow: 0 8px 24px rgba(22,22,22,0.10); display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+  .pin-bubble.ring { border-color: var(--accent); }
+  .pin-bubble .pin-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255,255,255,0.6); animation: pulseSoft 1.6s ease-in-out infinite; }
+  .pin-stem { width: 1.5px; height: 16px; margin: 0 auto; background: currentColor; opacity: 0.45; }
+  .pin-anchor { width: 11px; height: 11px; border-radius: 50%; border: 2.5px solid #fff; margin: -2px auto 0; box-shadow: 0 4px 10px rgba(22,22,22,0.18); }
+
+  .map-center { position: absolute; transform: translate(-50%,-50%); z-index: 5; }
+  .center-ring { width: 96px; height: 96px; border-radius: 50%; border: 1.5px solid var(--accent); animation: ringPulse 2.4s ease-out infinite; opacity: 0; }
+  .center-ring.b { animation-delay: 0.8s; }
+  .center-ring.c { animation-delay: 1.6s; }
+  @keyframes ringPulse { 0% { transform: scale(.4); opacity: 0; } 20% { opacity: 0.7; } 100% { transform: scale(2.8); opacity: 0; } }
+  .center-pin {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    width: 28px; height: 36px;
+    background: radial-gradient(circle at 30% 25%, #BCDBFF 0%, var(--accent) 55%, #1A4FA0 100%);
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    border: 3px solid #fff;
+    box-shadow: 0 6px 18px rgba(43,111,212,0.55);
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  .center-pin::after { content: ""; position: absolute; top: 4px; left: 5px; width: 6px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.7); }
+
+  .dossier-wrap { padding: 40px 24px 96px; flex: 1; display: flex; justify-content: center; }
+  .dossier { width: 100%; max-width: 720px; }
+  .dossier-head {
+    display: flex; gap: 24px; align-items: center; padding: 28px;
+    background: linear-gradient(135deg, var(--coral-soft) 0%, var(--surface) 60%, var(--lemon-soft) 130%);
+    border: 1px solid var(--line); border-radius: 22px;
+    position: relative; overflow: hidden;
+  }
+  .dossier-head::before {
+    content: ""; position: absolute; right: -40px; top: -40px; width: 220px; height: 220px;
+    background: radial-gradient(circle, rgba(238,106,61,0.18) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .risk-circle { width: 110px; height: 110px; flex-shrink: 0; position: relative; }
+  .risk-circle svg { transform: rotate(-90deg); }
+  .risk-circle .num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 38px; font-weight: 500; letter-spacing: -0.02em; font-family: 'Instrument Serif', serif; font-style: italic; }
+  .risk-meta { flex: 1; min-width: 0; }
+  .risk-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 11px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; text-transform: uppercase; }
+  .risk-tag.coral { background: var(--coral-soft); color: var(--coral); }
+  .risk-tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .risk-tag.teal { background: var(--teal-soft); color: var(--teal); }
+  .risk-tag.blue { background: var(--accent-soft); color: var(--accent); }
+  .risk-tag.purple { background: var(--purple-soft); color: var(--purple); }
+  .risk-tag.neutral { background: rgba(22,22,22,0.05); color: var(--ink-2); }
+  .risk-headline { margin: 12px 0 4px; font-size: 22px; line-height: 1.22; letter-spacing: -0.02em; font-weight: 500; }
+  .risk-headline em { font-style: italic; font-family: 'Instrument Serif', serif; font-weight: 400; color: var(--coral); }
+  .risk-addr { font-size: 13px; color: var(--ink-3); }
+  .risk-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+  .section { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; transition: box-shadow .2s, transform .2s; }
+  .section:hover { box-shadow: 0 14px 32px rgba(22,22,22,0.05); }
+  .sec-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; cursor: pointer; user-select: none; }
+  .sec-icon { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6), 0 4px 10px rgba(22,22,22,0.05); transition: transform .2s; }
+  .sec-head:hover .sec-icon { transform: rotate(-6deg) scale(1.05); }
+  .sec-title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sec-title h3 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
+  .sec-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); }
+  .sec-toggle { color: var(--ink-3); transition: transform .2s; display: inline-flex; }
+  .sec-toggle.open { transform: rotate(180deg); }
+  .sec-body { padding: 0 20px 20px; }
+  .sec-body p { margin: 0 0 12px; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+  .sec-body p:last-child { margin-bottom: 0; }
+
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 0.5px solid var(--line-2); gap: 12px; }
+  .stat-row:last-child { border-bottom: 0; }
+  .stat-label { font-size: 13px; color: var(--ink-3); }
+  .stat-val { font-size: 13.5px; font-family: 'JetBrains Mono', monospace; color: var(--ink); text-align: right; }
+  .stat-val .small { color: var(--ink-3); font-size: 11.5px; }
+
+  .prob-block { margin-top: 14px; padding: 16px; background: var(--coral-soft); border-radius: 10px; }
+  .prob-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .prob-label { font-size: 12.5px; color: var(--ink-2); }
+  .prob-pct { font-size: 28px; font-weight: 500; letter-spacing: -0.02em; color: var(--coral); font-family: 'Instrument Serif', serif; font-style: italic; }
+  .prob-bar { margin-top: 10px; height: 8px; background: rgba(216,90,48,0.18); border-radius: 4px; overflow: hidden; }
+  .prob-bar .fill { height: 100%; background: var(--coral); border-radius: 4px; animation: barFill 1.1s cubic-bezier(.4,0,.2,1) both; }
+  .prob-foot { margin-top: 8px; font-size: 11.5px; font-family: 'JetBrains Mono', monospace; color: var(--ink-3); display: flex; justify-content: space-between; }
+
+  .ins-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .ins-card { padding: 16px; border: 1px solid var(--line); border-radius: 14px; cursor: pointer; transition: transform .2s cubic-bezier(.34,1.56,.64,1), border-color .15s, box-shadow .2s; background: var(--surface); position: relative; }
+  .ins-card:hover { transform: translateY(-3px) rotate(-0.4deg); box-shadow: 0 14px 32px rgba(22,22,22,0.08); border-color: var(--accent); }
+  .ins-card.recommended { border: 1.5px solid var(--teal); background: linear-gradient(160deg, var(--teal-soft) 0%, #fff 60%); }
+  .ins-card .recbadge { position: absolute; top: -10px; right: 12px; background: linear-gradient(135deg, var(--teal) 0%, #0AB084 100%); color: #fff; font-size: 10.5px; font-family: 'JetBrains Mono', monospace; padding: 4px 10px; border-radius: 999px; letter-spacing: 0.04em; box-shadow: 0 4px 10px rgba(15,138,106,0.4); }
+  .ins-name { font-size: 13.5px; font-weight: 500; }
+  .ins-cost { margin-top: 4px; font-size: 11.5px; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; }
+  .ins-desc { margin-top: 8px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+  .ins-why { margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--line-2); font-size: 11.5px; color: var(--ink-3); line-height: 1.45; }
+
+  .action-row { display: flex; gap: 14px; padding: 14px 0; border-bottom: 0.5px solid var(--line-2); }
+  .action-row:last-child { border-bottom: 0; }
+  .action-num { width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--pink-soft) 100%);
+    border: 1px solid var(--line); display: grid; place-items: center;
+    font-family: 'Instrument Serif', serif; font-size: 15px; font-style: italic; color: var(--accent);
+    flex-shrink: 0; margin-top: 1px; transition: transform .2s; }
+  .action-row:hover .action-num { transform: scale(1.1) rotate(-6deg); }
+  .action-body { flex: 1; min-width: 0; }
+  .action-title { font-size: 14px; font-weight: 500; }
+  .action-title .cost { font-family: 'JetBrains Mono', monospace; color: var(--ink-3); font-weight: 400; font-size: 12px; margin-left: 8px; }
+  .action-desc { margin-top: 4px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+  .action-contact { margin-top: 6px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+
+  .news-row { display: grid; grid-template-columns: 80px 1fr 90px; gap: 16px; padding: 12px 0; border-bottom: 0.5px solid var(--line-2); align-items: baseline; }
+  .news-row:last-child { border-bottom: 0; }
+  .news-date { font-size: 11.5px; font-family: 'JetBrains Mono', monospace; color: var(--ink-4); }
+  .news-title { font-size: 13.5px; line-height: 1.4; color: var(--ink); }
+  .news-source { font-size: 11.5px; color: var(--ink-3); text-align: right; }
+
+  .method-foot { margin-top: 32px; padding: 20px 24px; border: 0.5px dashed var(--line); border-radius: 14px; font-size: 11.5px; color: var(--ink-3); line-height: 1.7; font-family: 'JetBrains Mono', monospace; }
+  .method-foot strong { color: var(--ink-2); font-weight: 500; }
+  .method-foot .small { font-size: 11px; }
+
+  .dossier-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .dossier-toolbar .back { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); cursor: pointer; padding: 6px 10px; border-radius: 6px; }
+  .dossier-toolbar .back:hover { color: var(--ink); background: var(--surface); }
+  .dossier-toolbar .meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); letter-spacing: 0.04em; text-transform: uppercase; }
+
+  body.dark {
+    --bg: #131416;
+    --surface: #1A1B1E;
+    --ink: #F2F2F0;
+    --ink-2: #C9C9C7;
+    --ink-3: #8A8A88;
+    --ink-4: #5A5A58;
+    --line: rgba(255,255,255,0.10);
+    --line-2: rgba(255,255,255,0.05);
+    --accent: #6FA8DD;
+    --accent-soft: rgba(111,168,221,0.14);
+    --teal: #4FB89A;
+    --teal-soft: rgba(79,184,154,0.14);
+    --amber: #E5A946;
+    --amber-soft: rgba(229,169,70,0.14);
+    --coral: #F08363;
+    --coral-soft: rgba(240,131,99,0.14);
+    --purple: #9A8FE0;
+    --purple-soft: rgba(154,143,224,0.14);
+    --map-bg: #1F2123;
+    --map-water: #2A3946;
+    --map-park: #233027;
+    --map-road: #2A2B2D;
+    --map-stroke: rgba(255,255,255,0.14);
+  }
+  body.dark .wordmark .glyph { background: var(--ink); color: var(--bg); }
+  body.dark .search-submit { background: var(--accent); color: var(--bg); }
+  body.dark .map-overlay-tl, body.dark .map-overlay-tr .legend, body.dark .map-overlay-bl, body.dark .pin-bubble { background: rgba(26,27,30,0.92); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
+
+// ── ICONS ──────────────────────────────────────────────────────────────────
+const Icon = ({ name, size = 16, color = "currentColor" }) => {
+  const s = size;
+  const stroke = { stroke: color, strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" };
+  switch (name) {
+    case "search":      return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>);
+    case "arrow-right": return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M5 12h14M13 6l6 6-6 6"/></svg>);
+    case "arrow-left":  return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M19 12H5M11 6l-6 6 6 6"/></svg>);
+    case "chevron-down":return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="m6 9 6 6 6-6"/></svg>);
+    case "warn":        return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M12 4 2 20h20L12 4z"/><path d="M12 10v5M12 18v.01"/></svg>);
+    case "drop":        return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M12 3s7 7 7 12a7 7 0 1 1-14 0c0-5 7-12 7-12z"/></svg>);
+    case "dollar":      return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M12 3v18M16 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H8"/></svg>);
+    case "plus":        return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M12 5v14M5 12h14"/></svg>);
+    case "news":        return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>);
+    case "sun":         return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>);
+    case "moon":        return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M21 13a8 8 0 1 1-9.9-9.9 7 7 0 0 0 9.9 9.9z"/></svg>);
+    case "pin":         return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13z"/><circle cx="12" cy="9" r="2.5"/></svg>);
+    case "x":           return (<svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M6 6l12 12M18 6 6 18"/></svg>);
+    default: return null;
+  }
+};
+
+// ── DATA FIXTURES ──────────────────────────────────────────────────────────
+const EXAMPLES = [
+  { label: "4521 S Drexel Blvd, Chicago", code: "60653" },
+  { label: "Houston Heights, TX",        code: "77008" },
+  { label: "Hoboken, NJ",                code: "07030" },
+  { label: "Miami Beach, FL",            code: "33139" },
+];
+
+const AGENTS = [
+  { id: "fema",    name: "FEMA expert",
+    finding: "Zone X (minimal) — but map panel is from 2019. Address sits 600ft outside the AE boundary along Lake Michigan.",
+    pin: { x: 28, y: 58, label: "Zone X", tone: "amber" }, delay: 1100 },
+  { id: "local",   name: "311 analyst",
+    finding: "23 \"water in basement\" reports within 500m since 2021. Combined sewer service area; TARP McCook reservoir nearby but at capacity in 2023 storm.",
+    pin: { x: 46, y: 48, label: "23 reports", tone: "coral" }, delay: 1200 },
+  { id: "weather", name: "Weather analyst",
+    finding: "Nearest USGS gauge (North Branch Chicago River) at 1.4× normal discharge. NOAA HMI 7-day rainfall outlook: above normal.",
+    pin: { x: 18, y: 32, label: "Gauge 1.4×", tone: "blue" }, delay: 900 },
+  { id: "news",    name: "News scout",
+    finding: "5 GDELT articles in last 6 mo. Sept 2025 storm dumped 4.7\" in 90min, MWRD reversed flow into Lake. Focus on South Side basements.",
+    pin: { x: 72, y: 38, label: "Sep '25 storm", tone: "purple" }, delay: 1400 },
+  { id: "archive", name: "Archivist",
+    finding: "Cook County: 11 NOAA flood events in 10yr, 4 FEMA disaster declarations. 2008, 2013, 2020, 2023 caused widespread basement flooding.",
+    pin: { x: 62, y: 70, label: "11 events / 10y", tone: "amber" }, delay: 1100 },
+  { id: "risk",    name: "Risk analyst",
+    finding: "Synthesizing… Score 74/100. AEP ≈ 5.1%, 30-yr cumulative probability of basement flood ≈ 79%. FEMA gap material.",
+    pin: null, delay: 1600 },
+  { id: "advisor", name: "Advisor",
+    finding: "Drafting recommendations: prioritize sewer-backup rider + backwater valve before NFIP. Action plan sequenced by impact-to-cost.",
+    pin: null, delay: 1100 },
+];
+
+const TONE_HEX = {
+  blue:   "var(--accent)",
+  teal:   "var(--teal)",
+  amber:  "var(--amber)",
+  coral:  "var(--coral)",
+  purple: "var(--purple)",
+};
+
+const DOSSIER = {
+  score: 74,
+  level: "high",
+  headline_pre: "High urban flood risk —",
+  headline_em: "despite FEMA saying \"minimal\"",
+  address: "4521 S Drexel Blvd, Chicago IL 60653",
+  tags: [
+    { label: "Combined sewer", tone: "blue" },
+    { label: "FEMA Zone X",    tone: "amber" },
+    { label: "TARP-served",    tone: "neutral" },
+    { label: "Cook County",    tone: "neutral" },
+  ],
+  fema_gap: {
+    body: [
+      "FEMA's National Flood Hazard Layer puts this address in Zone X — what the agency labels \"minimal\" risk. That assessment measures one specific thing: a riverine or coastal 100-year flood. It does not measure sewer backup, the dominant flood mode for Chicago's combined-sewer service area.",
+      "Within 500m of this address, the city has logged 23 water-in-basement 311 reports since 2021. The block also sits below the McCook TARP overflow elevation. When the system is overwhelmed (≈ 1.5 in/hr sustained), MWRD has historically reversed flow into Lake Michigan and basements back up regardless of FEMA zone.",
+    ],
+    aep_pct: 5.1,
+    cum_pct: 79,
+    cum_label: "30-year mortgage",
+  },
+  infra: [
+    { label: "Sewer type",                  val: "Combined", small: "MWRD service area" },
+    { label: "Overwhelm threshold",         val: "1.5 in/hr", small: "sustained" },
+    { label: "Impervious surface (1km²)",   val: "62%" },
+    { label: "TARP coverage",               val: "Yes", small: "McCook reservoir" },
+    { label: "311 floods, 500m / 5yr",      val: "23" },
+    { label: "Nearest USGS gauge",          val: "05536123", small: "N. Branch · 1.4× normal" },
+    { label: "Ground elevation",            val: "180 m", small: "USGS 3DEP" },
+    { label: "Distance to Lake Michigan",   val: "0.9 km" },
+  ],
+  insurance: [
+    { type:"sewer_rider", name:"Sewer backup rider", cost:"~$55 / yr",
+      desc:"Add-on to your homeowners policy. Covers water that backs up through floor drains, toilets, sinks during a sewer overwhelm event.",
+      why:"Cheapest, most targeted protection for this exact failure mode in your area.",
+      recommended: true },
+    { type:"nfip", name:"NFIP Preferred Risk", cost:"$485 / yr",
+      desc:"Building $250K · contents $100K. Federal program. Not legally required in Zone X, but eligible at preferred-risk pricing.",
+      why:"Covers structural damage from surface flooding; complements the rider.",
+      recommended: false },
+    { type:"private", name:"Private excess flood", cost:"$320 / yr",
+      desc:"Excess coverage above the NFIP $250K building cap. Useful if your structure value exceeds federal limits.",
+      why:"Skip unless your home value is well above NFIP caps.",
+      recommended: false },
+    { type:"parametric", name:"Parametric (FloodFlash-style)", cost:"$240 / yr",
+      desc:"Sensor-triggered. If flood depth exceeds 6 in at the property, payout is automatic within 48 hours — no claim adjuster.",
+      why:"Speeds recovery, but trigger depths must be tuned carefully.",
+      recommended: false },
+  ],
+  actions: [
+    { title:"Disconnect downspouts", cost:"Free · DIY",
+      desc:"Redirect roof runoff onto your lawn instead of into the sewer. In a combined-sewer block, a single house can divert ~1,400 gallons per inch of rain.",
+      contact:"chicago.gov/downspout" },
+    { title:"Install a backwater valve", cost:"$1,200 – $2,500",
+      desc:"A one-way valve on your sewer lateral that closes when the main line surges. The single highest-impact upgrade for basement-backup risk.",
+      contact:"MWRD Cost-Share — (312) 751-3000" },
+    { title:"Add a sewer-backup rider", cost:"~$55 / yr",
+      desc:"Call your homeowners insurer and ask for a sewer/water-backup endorsement. Confirm the limit is at least $25K.",
+      contact:null },
+    { title:"Buy NFIP Preferred Risk policy", cost:"~$485 / yr",
+      desc:"Federal flood insurance. 30-day waiting period, so don't wait for a forecast. You're eligible at preferred-risk rates because you're outside the SFHA.",
+      contact:"floodsmart.gov" },
+    { title:"Sewer-camera inspection", cost:"$150 – $300",
+      desc:"Pre-existing breaks or root intrusion in your lateral roughly double your basement-backup exposure. Worth a one-time check.",
+      contact:null },
+    { title:"Apply to MWRD Rain-Ready cost-share", cost:"Up to $5,000 reimbursed",
+      desc:"Cook County reimburses qualifying mitigation work — valves, dry wells, permeable pavers — through MWRD's residential program.",
+      contact:"mwrd.org/rainready" },
+  ],
+  news: [
+    { date:"Apr 14, 2026", title:"South Side residents pack town hall over basement-flood payouts", source:"Block Club" },
+    { date:"Mar 02, 2026", title:"MWRD opens 2026 cost-share window for backwater valves", source:"Sun-Times" },
+    { date:"Sep 18, 2025", title:"Storm dumps 4.7\" in 90 minutes; CTA Red Line tunnels close", source:"Chicago Tribune" },
+    { date:"Aug 22, 2025", title:"Why FEMA's flood maps miss most Chicago flooding, explained", source:"WBEZ" },
+    { date:"Jul 09, 2025", title:"Hyde Park homeowners sue over repeat sewer backups", source:"Crain's Chicago" },
+  ],
+};
+
+// ── MAP ────────────────────────────────────────────────────────────────────
+const NeighborhoodMap = ({ dark = false }) => {
+  const blocks = [];
+  for (let i = 0; i < 8; i++) {
+    blocks.push(<line key={"v"+i} x1={120 + i*100} y1={0} x2={120 + i*100} y2={720} stroke="var(--map-road)" strokeWidth={i%3===0 ? 18 : 10} />);
+  }
+  for (let j = 0; j < 6; j++) {
+    blocks.push(<line key={"h"+j} x1={0} y1={90 + j*110} x2={1000} y2={90 + j*110} stroke="var(--map-road)" strokeWidth={j%3===0 ? 18 : 10} />);
+  }
+
+  const buildings = [];
+  let seed = 7;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let bx = 0; bx < 9; bx++) {
+    for (let by = 0; by < 7; by++) {
+      const x0 = bx*100 + 18, y0 = by*110 + 18;
+      const cells = 2 + Math.floor(rnd()*3);
+      for (let c = 0; c < cells; c++) {
+        const w = 14 + rnd()*20;
+        const h = 14 + rnd()*22;
+        const x = x0 + rnd()*(82-w);
+        const y = y0 + rnd()*(92-h);
+        buildings.push(<rect key={`b-${bx}-${by}-${c}`} x={x} y={y} width={w} height={h}
+          fill={dark ? "rgba(255,255,255,0.04)" : "rgba(22,22,22,0.05)"}
+          stroke="var(--map-stroke)" strokeWidth="0.5" />);
+      }
+    }
+  }
+
+  return (
+    <svg className="map-svg" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid slice">
+      <rect x="0" y="0" width="1000" height="720" fill="var(--map-bg)" />
+      <path d="M 600 470 Q 680 440 760 470 Q 820 530 780 600 Q 700 640 620 610 Q 560 560 600 470 Z"
+            fill="var(--map-park)" stroke="var(--map-stroke)" strokeWidth="0.5" />
+      <path d="M 920 0 Q 880 200 905 400 Q 940 560 920 720 L 1000 720 L 1000 0 Z"
+            fill="var(--map-water)" stroke="var(--map-stroke)" strokeWidth="0.5" />
+      <path d="M 0 220 Q 120 240 220 200 Q 320 170 380 240 Q 440 320 380 380"
+            fill="none" stroke="var(--map-water)" strokeWidth="22" strokeLinecap="round" />
+      {blocks}
+      {buildings}
+      <text x="700" y="540" fontFamily="JetBrains Mono" fontSize="11" fill="var(--ink-3)" letterSpacing="2">WASHINGTON PARK</text>
+      <text x="940" y="360" fontFamily="JetBrains Mono" fontSize="11" fill="var(--ink-3)" letterSpacing="2" transform="rotate(-90 940 360)">LAKE MICHIGAN</text>
+      <text x="120" y="200" fontFamily="JetBrains Mono" fontSize="10" fill="var(--ink-3)" letterSpacing="1.5">N. BRANCH CHICAGO RIVER</text>
+      <text x="60" y="100" fontFamily="JetBrains Mono" fontSize="10" fill="var(--ink-4)" letterSpacing="2">DREXEL BLVD</text>
+      <text x="60" y="430" fontFamily="JetBrains Mono" fontSize="10" fill="var(--ink-4)" letterSpacing="2">47TH ST</text>
+    </svg>
+  );
+};
+
+const MapPin = ({ pin, idx }) => {
+  const tone = TONE_HEX[pin.tone] || "var(--accent)";
+  return (
+    <div className="map-pin" style={{ left: pin.x + "%", top: pin.y + "%", animationDelay: (idx*60)+"ms" }}>
+      <div className="pin-bubble">
+        <span className="pin-dot" style={{ background: tone }}></span>
+        <span>{pin.label}</span>
+      </div>
+      <div className="pin-stem" style={{ background: tone }}></div>
+      <div className="pin-anchor" style={{ background: tone }}></div>
+    </div>
+  );
+};
+
+// ── SEARCH ─────────────────────────────────────────────────────────────────
+const SearchScreen = ({ onSubmit }) => {
+  const [val, setVal] = useState("");
+  const submit = (v) => { const final = v ?? val; if (final.trim()) onSubmit(final.trim()); };
+  return (
+    <div className="screen search-wrap">
+      <div className="mascot-cluster tl">
+        <div className="droplet"><div className="eyes"><div className="eye"/><div className="eye"/></div><div className="smile"/></div>
+      </div>
+      <div className="mascot-cluster br">
+        <div className="droplet sm"><div className="eyes"><div className="eye"/><div className="eye"/></div><div className="smile"/></div>
+      </div>
+
+      <div className="search-card">
+        <span className="eyebrow">FlutIQ</span>
+        <h1 className="lede">Your <em>real</em> flood risk.</h1>
+
+        <form className="search-input-row" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+          <span className="search-icon"><Icon name="search" size={18}/></span>
+          <input className="search-input" value={val} onChange={(e)=>setVal(e.target.value)}
+            placeholder="Address" />
+          <button className="search-submit" type="submit">Investigate <Icon name="arrow-right" size={14}/></button>
+        </form>
+
+        <div className="chip-row">
+          {EXAMPLES.map((ex) => (
+            <button key={ex.label} className="chip" onClick={() => { setVal(ex.label); submit(ex.label); }}>
+              {ex.label}
+            </button>
+          ))}
+        </div>
+
+        <details className="learn-more">
+          <summary>How it works</summary>
+          <div className="learn-body">
+            <p>Seven specialist agents query public datasets in parallel — FEMA flood zones, Chicago 311 reports, USGS stream gauges, NOAA forecasts, GDELT news — then synthesize a personalized dossier with insurance guidance and a prioritized action plan.</p>
+            <div className="learn-sources">FEMA NFHL · Chicago 311 · USGS · NOAA · Open-Meteo · GDELT · OpenFEMA</div>
+          </div>
+        </details>
+      </div>
+    </div>
+  );
+};
+
+// ── AGENTS / MAP ───────────────────────────────────────────────────────────
+const AgentsScreen = ({ address, onComplete, dark }) => {
+  const [tick, setTick] = useState(0);
+  const startedAt = useRef(Date.now());
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    let acc = 600;
+    const timers = AGENTS.map((_, i) => {
+      acc += AGENTS[i].delay;
+      return setTimeout(() => setTick(i+1), acc);
+    });
+    const completion = setTimeout(() => onComplete && onComplete(), acc + 700);
+    const tickClock = setInterval(() => setNow(Date.now()), 100);
+    return () => { timers.forEach(clearTimeout); clearTimeout(completion); clearInterval(tickClock); };
+  }, []);
+
+  const total = AGENTS.length;
+  const progress = Math.min(tick / total, 1);
+  const elapsed = ((now - startedAt.current)/1000).toFixed(1);
+  const cute = ["humming…","sleuthing…","peeking…","scribbling…","triangulating…","double-checking…","sniffing the data…"];
+
+  const visiblePins = AGENTS.slice(0, tick).filter(a => a.pin);
+
+  return (
+    <div className="screen agents-grid">
+      <aside className="agents-side">
+        <div className="agents-target">INVESTIGATING</div>
+        <div className="agents-addr">{address}</div>
+        <div className="progress-track"><div className="progress-fill" style={{width: (progress*100)+"%"}}/></div>
+        <div className="progress-meta">
+          <span>{tick} / {total} agents on it</span>
+          <span>{elapsed}s</span>
+        </div>
+
+        <div className="agent-list">
+          {AGENTS.map((a, i) => {
+            const status = i < tick ? "done" : i === tick ? "working" : "idle";
+            return (
+              <div key={a.id} className="agent-item">
+                <div className="agent-head">
+                  <span className={`agent-dot ${status}`}/>
+                  <span className="agent-name">{a.name}</span>
+                  <span className={`agent-status ${status}`}>{status}</span>
+                </div>
+                {(status === "done" || status === "working") && (
+                  <div className="agent-finding">
+                    {status === "working"
+                      ? <span style={{color:"var(--ink-3)"}}>{cute[i % cute.length]}</span>
+                      : a.finding}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="agents-foot">
+          ORCHESTRATOR · gemma-4-31b-it · thinking=on<br/>
+          5 agents in parallel · 2 sequential synthesis<br/>
+          all data sources public · 0 PII stored
+        </div>
+      </aside>
+
+      <div className="map-pane">
+        <NeighborhoodMap dark={dark}/>
+
+        <span className="sparkle" style={{position:"absolute",top:"12%",left:"22%"}}/>
+        <span className="sparkle s2" style={{position:"absolute",top:"28%",left:"78%",animationDelay:"-1.4s"}}/>
+        <span className="sparkle s3" style={{position:"absolute",top:"72%",left:"38%",animationDelay:"-0.6s"}}/>
+        <span className="sparkle" style={{position:"absolute",top:"82%",left:"66%",animationDelay:"-2s"}}/>
+
+        <div className="map-center" style={{ left: "50%", top: "50%" }}>
+          <div style={{position:"relative", width:0, height:0}}>
+            <div className="center-ring" style={{position:"absolute", left:-48, top:-48}}/>
+            <div className="center-ring b" style={{position:"absolute", left:-48, top:-48}}/>
+            <div className="center-ring c" style={{position:"absolute", left:-48, top:-48}}/>
+            <div className="center-pin"/>
+          </div>
+        </div>
+
+        {visiblePins.map((a, i) => <MapPin key={a.id} pin={a.pin} idx={i}/>)}
+
+        <div className="map-overlay-tl">
+          41.8127°N · 87.6066°W<br/>
+          ZOOM 16 · 500m radius
+        </div>
+        <div className="map-overlay-tr">
+          <div className="legend">
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"var(--accent)"}}/> address</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"var(--coral)"}}/> 311 reports</div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:"var(--amber)"}}/> hazard data</div>
+          </div>
+        </div>
+        <div className="map-overlay-bl">
+          basemap · synthetic / illustrative
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── DOSSIER ────────────────────────────────────────────────────────────────
+const Section = ({ icon, iconBg, num, title, badge, children, defaultOpen = true }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="section">
+      <div className="sec-head" onClick={()=>setOpen(o=>!o)}>
+        <div className="sec-icon" style={{ background: iconBg }}>{icon}</div>
+        <div className="sec-title">
+          <span className="sec-num">{num}</span>
+          <h3>{title}</h3>
+          {badge}
+        </div>
+        <span className={`sec-toggle ${open ? "open" : ""}`}><Icon name="chevron-down" size={18}/></span>
+      </div>
+      {open && <div className="sec-body">{children}</div>}
+    </section>
+  );
+};
+
+const RiskCircle = ({ score }) => {
+  const color = score >= 61 ? "var(--coral)" : score >= 31 ? "var(--amber)" : "var(--teal)";
+  const C = 2 * Math.PI * 42;
+  return (
+    <div className="risk-circle">
+      <svg width="96" height="96" viewBox="0 0 96 96">
+        <circle cx="48" cy="48" r="42" stroke="var(--line-2)" strokeWidth="6" fill="none"/>
+        <circle cx="48" cy="48" r="42" stroke={color} strokeWidth="6" fill="none"
+          strokeDasharray={C} strokeDashoffset={C * (1 - score/100)} strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)" }}/>
+      </svg>
+      <div className="num" style={{ color }}>{score}</div>
+    </div>
+  );
+};
+
+const DossierScreen = ({ onBack }) => {
+  const D = DOSSIER;
+  return (
+    <div className="screen dossier-wrap">
+      <div className="dossier">
+        <div className="dossier-toolbar">
+          <span className="back" onClick={onBack}><Icon name="arrow-left" size={14}/> new search</span>
+          <span className="meta">DOSSIER · {new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"2-digit"}).toUpperCase()} · v1</span>
+        </div>
+
+        <div className="dossier-head">
+          <RiskCircle score={D.score}/>
+          <div className="risk-meta">
+            <span className="risk-tag coral">High risk · {D.score}/100</span>
+            <h2 className="risk-headline">{D.headline_pre} <em>{D.headline_em}</em></h2>
+            <div className="risk-addr">{D.address}</div>
+            <div className="risk-tags">
+              {D.tags.map((t,i) => <span key={i} className={`risk-tag ${t.tone}`}>{t.label}</span>)}
+            </div>
+          </div>
+        </div>
+
+        <Section
+          num="§01"
+          icon={<Icon name="warn" color="var(--coral)" size={16}/>}
+          iconBg="var(--coral-soft)"
+          title="The FEMA gap"
+          badge={<span className="risk-tag coral">misleading</span>}>
+          {D.fema_gap.body.map((p,i) => <p key={i}>{p}</p>)}
+          <div className="prob-block">
+            <div className="prob-head">
+              <span className="prob-label">Probability of at least one basement flood over a {D.fema_gap.cum_label}</span>
+              <span className="prob-pct">{D.fema_gap.cum_pct}%</span>
+            </div>
+            <div className="prob-bar"><div className="fill" style={{width: D.fema_gap.cum_pct + "%"}}/></div>
+            <div className="prob-foot">
+              <span>AEP {D.fema_gap.aep_pct}% · per year</span>
+              <span>P = 1 − (1 − AEP)<sup>30</sup></span>
+            </div>
+          </div>
+        </Section>
+
+        <Section
+          num="§02"
+          icon={<Icon name="drop" color="var(--accent)" size={16}/>}
+          iconBg="var(--accent-soft)"
+          title="Local infrastructure">
+          {D.infra.map((s,i) => (
+            <div key={i} className="stat-row">
+              <span className="stat-label">{s.label}</span>
+              <span className="stat-val">{s.val}{s.small && <span className="small"> · {s.small}</span>}</span>
+            </div>
+          ))}
+        </Section>
+
+        <Section
+          num="§03"
+          icon={<Icon name="dollar" color="var(--purple)" size={16}/>}
+          iconBg="var(--purple-soft)"
+          title="Insurance guidance"
+          badge={<span className="risk-tag teal">personalized</span>}>
+          <p>Federal law does <strong>not</strong> require flood insurance for Zone X, so most lenders won't ask. That's the gap. Given your block's actual flood mode (sewer backup, not riverine), the most cost-effective coverage starts with a sewer-backup rider on your existing homeowners policy.</p>
+          <div className="ins-grid">
+            {D.insurance.map((c,i) => (
+              <div key={i} className={"ins-card" + (c.recommended ? " recommended" : "")}>
+                {c.recommended && <span className="recbadge">recommended</span>}
+                <div className="ins-name">{c.name}</div>
+                <div className="ins-cost">{c.cost}</div>
+                <div className="ins-desc">{c.desc}</div>
+                <div className="ins-why">Why · {c.why}</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section
+          num="§04"
+          icon={<Icon name="plus" color="var(--teal)" size={16}/>}
+          iconBg="var(--teal-soft)"
+          title="Your action plan">
+          {D.actions.map((a,i) => (
+            <div key={i} className="action-row">
+              <div className="action-num">{i+1}</div>
+              <div className="action-body">
+                <div className="action-title">{a.title}<span className="cost">· {a.cost}</span></div>
+                <div className="action-desc">{a.desc}</div>
+                {a.contact && <div className="action-contact">{a.contact}</div>}
+              </div>
+            </div>
+          ))}
+        </Section>
+
+        <Section
+          num="§05"
+          icon={<Icon name="news" color="var(--amber)" size={16}/>}
+          iconBg="var(--amber-soft)"
+          title="Recent local flood news">
+          {D.news.map((n,i) => (
+            <div key={i} className="news-row">
+              <span className="news-date">{n.date.toUpperCase()}</span>
+              <span className="news-title">{n.title}</span>
+              <span className="news-source">{n.source}</span>
+            </div>
+          ))}
+        </Section>
+
+        <div className="method-foot">
+          <strong>Methodology.</strong> Risk score synthesizes FEMA NFHL flood zone, City of Chicago 311 water-in-basement reports (500m / 5yr), USGS stream-gauge percentiles, NOAA Storm Events for Cook County (10yr), Open-Meteo flood discharge forecast, and GDELT news coverage. Cumulative probability uses standard P = 1 − (1 − AEP)<sup>n</sup>. All analysis runs locally on Gemma 4. No PII is stored.<br/>
+          <span className="small">This is not financial or insurance advice. Confirm specifics with a licensed broker before purchasing coverage.</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── CHROME ─────────────────────────────────────────────────────────────────
+const Chrome = ({ screen, onJump, dark, onToggleDark }) => (
+  <div className="app-chrome">
+    <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
+      <span className="glyph">F</span>
+      <span>FlutIQ</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.4 · prototype</span>
+    </div>
+    <div className="chrome-meta">
+      <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>
+      <span className={"pill" + (screen === "search" ? " active" : "")} onClick={()=>onJump("search")}>search</span>
+      <span className={"pill" + (screen === "agents" ? " active" : "")} onClick={()=>onJump("agents")}>agents</span>
+      <span className={"pill" + (screen === "dossier" ? " active" : "")} onClick={()=>onJump("dossier")}>dossier</span>
+      <button className="icon-btn" onClick={onToggleDark} aria-label="Toggle dark mode" title="Toggle dark mode">
+        <Icon name={dark ? "sun" : "moon"} size={14}/>
+      </button>
+    </div>
+  </div>
+);
+
+// ── APP ────────────────────────────────────────────────────────────────────
+const App = () => {
+  const [screen, setScreen] = useState("search");
+  const [address, setAddress] = useState("4521 S Drexel Blvd, Chicago IL 60653");
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle("dark", dark);
+  }, [dark]);
+
+  const handleSubmit = (addr) => {
+    setAddress(addr.length > 36 ? addr : addr + " IL 60653");
+    setScreen("agents");
+  };
+
+  return (
+    <>
+      <Chrome screen={screen} onJump={setScreen} dark={dark} onToggleDark={() => setDark(d => !d)}/>
+      {screen === "search"  && <SearchScreen onSubmit={handleSubmit}/>}
+      {screen === "agents"  && <AgentsScreen address={address} dark={dark} onComplete={()=>setScreen("dossier")} />}
+      {screen === "dossier" && <DossierScreen onBack={()=>setScreen("search")} />}
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("app")).render(<App/>);
+</script>
+</body>
+</html>
