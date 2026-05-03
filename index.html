@@ -643,11 +643,9 @@ const NeighborhoodMap = ({ dark = false }) => {
             fill="none" stroke="var(--map-water)" strokeWidth="22" strokeLinecap="round" />
       {blocks}
       {buildings}
-      <text x="700" y="540" fontFamily="JetBrains Mono" fontSize="11" fill="var(--ink-3)" letterSpacing="2">WASHINGTON PARK</text>
-      <text x="940" y="360" fontFamily="JetBrains Mono" fontSize="11" fill="var(--ink-3)" letterSpacing="2" transform="rotate(-90 940 360)">LAKE MICHIGAN</text>
-      <text x="120" y="200" fontFamily="JetBrains Mono" fontSize="10" fill="var(--ink-3)" letterSpacing="1.5">N. BRANCH CHICAGO RIVER</text>
-      <text x="60" y="100" fontFamily="JetBrains Mono" fontSize="10" fill="var(--ink-4)" letterSpacing="2">DREXEL BLVD</text>
-      <text x="60" y="430" fontFamily="JetBrains Mono" fontSize="10" fill="var(--ink-4)" letterSpacing="2">47TH ST</text>
+      <text x="700" y="540" fontFamily="JetBrains Mono" fontSize="11" fill="var(--ink-3)" letterSpacing="2">PARK</text>
+      <text x="940" y="360" fontFamily="JetBrains Mono" fontSize="11" fill="var(--ink-3)" letterSpacing="2" transform="rotate(-90 940 360)">WATER</text>
+      <text x="120" y="200" fontFamily="JetBrains Mono" fontSize="10" fill="var(--ink-3)" letterSpacing="1.5">RIVER</text>
     </svg>
   );
 };
@@ -918,9 +916,10 @@ const mapDossier = (raw) => {
   const infra = [
     { label: "FEMA flood zone", val: fema.flood_zone || "—",
       small: fema.is_sfha ? "Special Flood Hazard Area" : (fema.zone_description ? "outside SFHA" : null) },
-    { label: "Basement-flood 311 reports", val: local.basement_flooding_reports ?? "—",
-      small: local.data_available ? `${local?.raw?.years || 5}y · ${local?.raw?.radius_m || 500}m` : "no local dataset" },
-    { label: "Street-flood 311 reports", val: local.street_flooding_reports ?? "—" },
+    { label: "Basement-flood 311 reports", val: local.data_available ? (local.basement_flooding_reports ?? "—") : "—",
+      small: local.data_available ? `${local?.raw?.years || 5}y · ${local?.raw?.radius_m || 500}m` : "no 311 dataset wired for this city" },
+    { label: "Street-flood 311 reports", val: local.data_available ? (local.street_flooding_reports ?? "—") : "—",
+      small: local.data_available ? null : "no 311 dataset wired for this city" },
     { label: "Nearest stream gauge", val: gaugeName,
       small: gaugeHeight != null ? `${gaugeHeight} ft current` : null },
     { label: "Active flood alerts", val: (weather.active_flood_alerts?.length ?? 0).toString(),
@@ -1137,7 +1136,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <div className="method-foot">
-          <strong>Methodology.</strong> Risk score synthesizes FEMA NFHL flood zone, City of Chicago 311 water-in-basement reports (500m / 5yr), USGS stream-gauge percentiles, NOAA Storm Events for Cook County (10yr), Open-Meteo flood discharge forecast, and GDELT news coverage. Cumulative probability uses standard P = 1 − (1 − AEP)<sup>n</sup>. All analysis runs locally on Gemma 4. No PII is stored.<br/>
+          <strong>Methodology.</strong> Seven specialist agents run in parallel: FEMA NFHL for the official flood zone, USGS Water Services for the nearest stream gauge, NOAA NWS for the local forecast and active flood alerts, Open-Meteo for the 7-day flood and precipitation outlook, and GDELT for recent and 24-month flood news. In Chicago we also pull City of Chicago 311 water-in-basement and street-flooding reports within 500m / 5yr; other cities show <code>—</code> until a local 311 source is wired. A risk-analyst agent then synthesizes everything using Gemma 4 reasoning mode, computing AEP and cumulative 30-year probability with P = 1 − (1 − AEP)<sup>n</sup>. An advisor agent translates the risk into insurance and mitigation actions. All Gemma 4 calls go through the OpenRouter free tier; nothing about your address is stored.<br/>
           <span className="small">This is not financial or insurance advice. Confirm specifics with a licensed broker before purchasing coverage.</span>
         </div>
       </div>
