@@ -166,7 +166,9 @@ async def run_assessment(address: str) -> AsyncGenerator[str, None]:
         "summary": "Generating insurance + mitigation plan...",
     })
     try:
-        advisor_result = await run_advisor_agent(results, geo["display_name"])
+        advisor_result = await run_advisor_agent(
+            {**results, "_geo": geo}, geo["display_name"]
+        )
         results["advisor"] = advisor_result
         yield sse("agent_update", {
             "agent": "advisor",

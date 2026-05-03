@@ -1,7 +1,20 @@
-"""GDELT 2.0 DOC API — recent flood news search. Free, no auth."""
+"""GDELT 2.0 DOC API — recent flood news search. Free, no auth.
+
+GDELT publicly enforces ~1 request per 5 seconds; over that and you
+get HTTP 429 with a plain-text 'Please limit requests' body. The
+news and archive agents both call this tool in parallel, so we
+serialize calls process-wide via a lock and a minimum 5.5s gap.
+This adds ~5s per assessment but eliminates silent empty results.
+"""
+import asyncio
+import time
+
 import httpx
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+_MIN_GAP_SECONDS = 5.5
+_lock = asyncio.Lock()
+_last_call_at = 0.0
 
 
 async def search_flood_news(
@@ -27,12 +40,30 @@ async def search_flood_news(
         "sort": "DateDesc",
     }
 
-    async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.get(GDELT_URL, params=params)
+    global _last_call_at
+    # GDELT limits to 1/5s per IP across ALL callers (other processes,
+    # earlier curl tests, etc.). The intra-process lock can't see those,
+    # so on 429 we wait the cool-down and retry once before giving up.
+    async with _lock:
+        for attempt in range(2):
+            gap = time.monotonic() - _last_call_at
+            if gap < _MIN_GAP_SECONDS:
+                await asyncio.sleep(_MIN_GAP_SECONDS - gap)
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.get(GDELT_URL, params=params)
+            _last_call_at = time.monotonic()
+            if resp.status_code != 429:
+                break
+            if attempt == 0:
+                await asyncio.sleep(_MIN_GAP_SECONDS + 1.0)
+
     if resp.status_code != 200:
         return []
 
-    # GDELT sometimes returns HTML on bad queries; defensively parse.
+    # GDELT returns HTML or plain text on rate-limit or bad queries.
+    body = resp.text or ""
+    if not body.strip().startswith(("{", "[")):
+        return []
     try:
         data = resp.json()
     except ValueError:

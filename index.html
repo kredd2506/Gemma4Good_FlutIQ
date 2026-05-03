@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <style>
   :root {
     --bg: #F6F4EE;
@@ -603,7 +605,77 @@ const DOSSIER = {
   ],
 };
 
-// ── MAP ────────────────────────────────────────────────────────────────────
+// ── REAL MAP (Leaflet) ─────────────────────────────────────────────────────
+// Renders an actual basemap centered on the geocoded lat/lon. Falls back to
+// the synthetic illustrative grid below when no geocode is available yet
+// (i.e. while the request is in-flight).
+const RealMap = ({ geocode, dark = false }) => {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const circleRef = useRef(null);
+
+  // Initialize the Leaflet map once.
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    if (typeof L === "undefined") return;  // Leaflet not yet loaded
+    const map = L.map(containerRef.current, {
+      zoomControl: false,
+      attributionControl: true,
+      scrollWheelZoom: false,
+      dragging: true,
+    }).setView([39.5, -98.35], 4);  // continental US default
+    L.tileLayer(
+      dark
+        ? "https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png"
+        : "https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: '© <a href="https://openstreetmap.org/copyright">OSM</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+      }
+    ).addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    mapRef.current = map;
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+      circleRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recenter whenever geocode arrives or changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !geocode) return;
+    const { lat, lon } = geocode;
+    map.setView([lat, lon], 15, { animate: true });
+
+    if (markerRef.current) markerRef.current.remove();
+    if (circleRef.current) circleRef.current.remove();
+
+    const dropletIcon = L.divIcon({
+      className: "",
+      html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#2B6FD4;border:3px solid #fff;box-shadow:0 4px 14px rgba(43,111,212,0.45);"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 18],
+    });
+    markerRef.current = L.marker([lat, lon], { icon: dropletIcon }).addTo(map);
+    circleRef.current = L.circle([lat, lon], {
+      radius: 500,  // matches our 311 / weather search radii
+      color: "#2B6FD4",
+      weight: 1.5,
+      opacity: 0.6,
+      fillColor: "#2B6FD4",
+      fillOpacity: 0.06,
+    }).addTo(map);
+  }, [geocode]);
+
+  return <div ref={containerRef} style={{ position: "absolute", inset: 0, background: "var(--map-bg)" }} />;
+};
+
+// ── MAP (synthetic fallback used pre-geocode and as design reference) ──────
 const NeighborhoodMap = ({ dark = false }) => {
   const blocks = [];
   for (let i = 0; i < 8; i++) {
@@ -790,40 +862,38 @@ const AgentsScreen = ({ address, onComplete, dark }) => {
       </aside>
 
       <div className="map-pane">
-        <NeighborhoodMap dark={dark}/>
+        {geocode
+          ? <RealMap geocode={geocode} dark={dark}/>
+          : <NeighborhoodMap dark={dark}/>}
 
-        <span className="sparkle" style={{position:"absolute",top:"12%",left:"22%"}}/>
-        <span className="sparkle s2" style={{position:"absolute",top:"28%",left:"78%",animationDelay:"-1.4s"}}/>
-        <span className="sparkle s3" style={{position:"absolute",top:"72%",left:"38%",animationDelay:"-0.6s"}}/>
-        <span className="sparkle" style={{position:"absolute",top:"82%",left:"66%",animationDelay:"-2s"}}/>
-
-        <div className="map-center" style={{ left: "50%", top: "50%" }}>
-          <div style={{position:"relative", width:0, height:0}}>
-            <div className="center-ring" style={{position:"absolute", left:-48, top:-48}}/>
-            <div className="center-ring b" style={{position:"absolute", left:-48, top:-48}}/>
-            <div className="center-ring c" style={{position:"absolute", left:-48, top:-48}}/>
-            <div className="center-pin"/>
+        {!geocode && (
+          <div className="map-center" style={{ left: "50%", top: "50%" }}>
+            <div style={{position:"relative", width:0, height:0}}>
+              <div className="center-ring" style={{position:"absolute", left:-48, top:-48}}/>
+              <div className="center-ring b" style={{position:"absolute", left:-48, top:-48}}/>
+              <div className="center-ring c" style={{position:"absolute", left:-48, top:-48}}/>
+              <div className="center-pin"/>
+            </div>
           </div>
-        </div>
+        )}
 
-        {visiblePins.map((a, i) => <MapPin key={a.id} pin={a.pin} idx={i}/>)}
-
-        <div className="map-overlay-tl">
+        <div className="map-overlay-tl" style={{zIndex: 500}}>
           {geocode
             ? `${Math.abs(geocode.lat).toFixed(4)}°${geocode.lat >= 0 ? "N" : "S"} · ${Math.abs(geocode.lon).toFixed(4)}°${geocode.lon >= 0 ? "E" : "W"}`
             : "geocoding…"}<br/>
-          ZOOM 16 · 500m radius
+          ZOOM 15 · 500m search radius
         </div>
-        <div className="map-overlay-tr">
+        <div className="map-overlay-tr" style={{zIndex: 500}}>
           <div className="legend">
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"var(--accent)"}}/> address</div>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"var(--coral)"}}/> 311 reports</div>
-            <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:"var(--amber)"}}/> hazard data</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"var(--accent)"}}/> property</div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:14,height:8,borderRadius:"3px",background:"rgba(43,111,212,0.2)",border:"1px solid var(--accent)"}}/> 500m radius</div>
           </div>
         </div>
-        <div className="map-overlay-bl">
-          basemap · synthetic / illustrative
-        </div>
+        {!geocode && (
+          <div className="map-overlay-bl" style={{zIndex: 500}}>
+            basemap · synthetic placeholder
+          </div>
+        )}
       </div>
     </div>
   );
@@ -930,14 +1000,35 @@ const mapDossier = (raw) => {
     { label: "FEMA panel", val: fema?.raw?.DFIRM_ID || "—" },
   ];
 
-  const insurance = (advisor.insurance_recommendations || []).map(i => ({
-    type: (i.policy_type || "").toLowerCase().replace(/\s+/g, "_"),
-    name: i.policy_type || "Coverage option",
-    cost: i.estimated_cost || "—",
-    desc: i.covers || "",
-    why: i.rationale || "",
-    recommended: (i.priority || "").toLowerCase() === "essential",
-  }));
+  const _PRIORITY_LABEL = {
+    start_here: "start here",
+    also_consider: "also consider",
+    only_if: "only if",
+    essential: "start here",      // legacy
+    recommended: "also consider", // legacy
+    optional: "only if",          // legacy
+  };
+  const insurance = (advisor.insurance_recommendations || []).map(i => {
+    const prio = (i.priority || "").toLowerCase();
+    return {
+      type: (i.policy_type || "").toLowerCase().replace(/\s+/g, "_"),
+      name: i.policy_type || "Coverage option",
+      cost: i.estimated_cost || "—",
+      desc: i.covers || "",
+      not_covered: i.does_not_cover || "",
+      how_to_buy: i.how_to_buy || "",
+      why: i.rationale || "",
+      priority: prio,
+      priority_label: _PRIORITY_LABEL[prio] || prio,
+      recommended: prio === "start_here" || prio === "essential",
+    };
+  });
+  // Sort: start_here → also_consider → only_if → unknown
+  const _PRIORITY_ORDER = { start_here: 0, essential: 0, also_consider: 1, recommended: 1, only_if: 2, optional: 2 };
+  insurance.sort((a, b) =>
+    (_PRIORITY_ORDER[a.priority] ?? 9) - (_PRIORITY_ORDER[b.priority] ?? 9)
+  );
+  const advisor_tldr = advisor.tldr || "";
 
   const actions = (advisor.mitigation_actions || []).map(a => ({
     title: a.action || "Action",
@@ -980,6 +1071,7 @@ const mapDossier = (raw) => {
     risk_factors: risk.key_risk_factors || [],
     mitigating_factors: risk.mitigating_factors || [],
     reasoning_trace: risk.reasoning_trace || "",
+    advisor_tldr,
   };
 };
 
@@ -1010,10 +1102,76 @@ const DossierScreen = ({ onBack, dossier }) => {
 
         <Section
           num="§01"
+          icon={<Icon name="plus" color="var(--teal)" size={16}/>}
+          iconBg="var(--teal-soft)"
+          title="Start here — what to do this month"
+          badge={<span className="risk-tag teal">personalized</span>}>
+          <p style={{color:"var(--ink-2)"}}>You don't need to read the rest of this dossier to take the first step. These actions are sequenced cheapest-and-easiest first; do as many as feel right for your situation.</p>
+          {D.actions.length === 0 ? (
+            <p style={{color:"var(--ink-3)"}}>The advisor agent did not return an action plan for this address.</p>
+          ) : D.actions.map((a,i) => (
+            <div key={i} className="action-row">
+              <div className="action-num">{i+1}</div>
+              <div className="action-body">
+                <div className="action-title">{a.title}<span className="cost">· {a.cost}</span></div>
+                <div className="action-desc">{a.desc}</div>
+                {a.contact && <div className="action-contact">{a.contact}</div>}
+              </div>
+            </div>
+          ))}
+        </Section>
+
+        <Section
+          num="§02"
+          icon={<Icon name="dollar" color="var(--purple)" size={16}/>}
+          iconBg="var(--purple-soft)"
+          title="Insurance options, in plain English"
+          badge={<span className="risk-tag teal">verified products</span>}>
+          {D.advisor_tldr && (
+            <div style={{marginBottom: 14, padding: "12px 14px", background: "var(--teal-soft)", borderRadius: 10, fontSize: 14, color: "var(--ink)", lineHeight: 1.5}}>
+              <strong style={{color:"var(--teal)"}}>For this property: </strong>{D.advisor_tldr}
+            </div>
+          )}
+          <p style={{color:"var(--ink-2)"}}>Flood insurance feels intimidating, but the menu is short. The products listed here are real, verified, and currently available — never invented by the model. Prices are typical ranges; get an exact quote from the link or phone in each card.</p>
+          {D.insurance.length === 0 ? (
+            <p style={{color:"var(--ink-3)"}}>The advisor agent did not return insurance recommendations for this address.</p>
+          ) : (
+            <div className="ins-grid">
+              {D.insurance.map((c,i) => {
+                const tone = c.priority === "start_here" || c.priority === "essential" ? "teal"
+                          : c.priority === "also_consider" || c.priority === "recommended" ? "blue"
+                          : "neutral";
+                return (
+                  <div key={i} className={"ins-card" + (c.recommended ? " recommended" : "")}>
+                    {c.priority_label && <span className={`recbadge`} style={{background: `var(--${tone}-soft, rgba(22,22,22,0.05))`, color: `var(--${tone}, var(--ink-2))`}}>{c.priority_label}</span>}
+                    <div className="ins-name">{c.name}</div>
+                    <div className="ins-cost">{c.cost}</div>
+                    <div className="ins-desc">{c.desc}</div>
+                    {c.not_covered && (
+                      <div style={{marginTop:8, fontSize:12, color:"var(--ink-3)", lineHeight:1.5}}>
+                        <strong style={{color:"var(--coral)"}}>Doesn't cover · </strong>{c.not_covered}
+                      </div>
+                    )}
+                    <div className="ins-why" style={{marginTop:8}}>Why · {c.why}</div>
+                    {c.how_to_buy && (
+                      <div style={{marginTop:10, padding:"8px 10px", background:"var(--bg)", borderRadius:6, fontSize:12, color:"var(--ink-2)", lineHeight:1.5}}>
+                        <strong style={{color:"var(--accent)"}}>How to get it · </strong>{c.how_to_buy}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
+        <Section
+          num="§03"
           icon={<Icon name="warn" color="var(--coral)" size={16}/>}
           iconBg="var(--coral-soft)"
-          title="The FEMA gap"
-          badge={D.level === "low" ? null : <span className="risk-tag coral">misleading</span>}>
+          title="Why FEMA's flood map isn't the whole story"
+          badge={D.level === "low" ? null : <span className="risk-tag coral">FEMA may understate risk</span>}
+          defaultOpen={false}>
           {D.fema_gap.body.map((p,i) => <p key={i}>{p}</p>)}
           <div className="prob-block">
             <div className="prob-head">
@@ -1062,54 +1220,15 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num="§02"
+          num="§04"
           icon={<Icon name="drop" color="var(--accent)" size={16}/>}
           iconBg="var(--accent-soft)"
-          title="Local infrastructure">
+          title="The raw signals we looked at"
+          defaultOpen={false}>
           {D.infra.map((s,i) => (
             <div key={i} className="stat-row">
               <span className="stat-label">{s.label}</span>
               <span className="stat-val">{s.val}{s.small && <span className="small"> · {s.small}</span>}</span>
-            </div>
-          ))}
-        </Section>
-
-        <Section
-          num="§03"
-          icon={<Icon name="dollar" color="var(--purple)" size={16}/>}
-          iconBg="var(--purple-soft)"
-          title="Insurance guidance"
-          badge={<span className="risk-tag teal">personalized</span>}>
-          {D.insurance.length === 0 ? (
-            <p style={{color:"var(--ink-3)"}}>The advisor agent did not return insurance recommendations for this address.</p>
-          ) : (
-            <div className="ins-grid">
-              {D.insurance.map((c,i) => (
-                <div key={i} className={"ins-card" + (c.recommended ? " recommended" : "")}>
-                  {c.recommended && <span className="recbadge">recommended</span>}
-                  <div className="ins-name">{c.name}</div>
-                  <div className="ins-cost">{c.cost}</div>
-                  <div className="ins-desc">{c.desc}</div>
-                  <div className="ins-why">Why · {c.why}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        <Section
-          num="§04"
-          icon={<Icon name="plus" color="var(--teal)" size={16}/>}
-          iconBg="var(--teal-soft)"
-          title="Your action plan">
-          {D.actions.map((a,i) => (
-            <div key={i} className="action-row">
-              <div className="action-num">{i+1}</div>
-              <div className="action-body">
-                <div className="action-title">{a.title}<span className="cost">· {a.cost}</span></div>
-                <div className="action-desc">{a.desc}</div>
-                {a.contact && <div className="action-contact">{a.contact}</div>}
-              </div>
             </div>
           ))}
         </Section>
