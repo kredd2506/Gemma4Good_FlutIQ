@@ -368,7 +368,100 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
 <script type="text/babel">
-const { useState, useEffect, useMemo, useRef } = React;
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+// Backend URL. Override at runtime via window.FLOODIQ_API or query string ?api=...
+const API_URL = (() => {
+  const fromQuery = new URLSearchParams(window.location.search).get("api");
+  return fromQuery || window.FLOODIQ_API || "http://127.0.0.1:8000";
+})();
+
+// ── SSE hook ───────────────────────────────────────────────────────────────
+// Streams /api/assess. Surfaces per-agent status, geocode, dossier, errors.
+const useFloodAssessment = () => {
+  const [agentState, setAgentState] = useState({});  // {fema: {status, summary}, ...}
+  const [geocode, setGeocode] = useState(null);
+  const [dossier, setDossier] = useState(null);
+  const [error, setError] = useState(null);
+  const [running, setRunning] = useState(false);
+  const abortRef = useRef(null);
+
+  const reset = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = null;
+    setAgentState({});
+    setGeocode(null);
+    setDossier(null);
+    setError(null);
+    setRunning(false);
+  }, []);
+
+  const start = useCallback(async (address) => {
+    reset();
+    setRunning(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const resp = await fetch(`${API_URL}/api/assess`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+        signal: controller.signal,
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.body) throw new Error("no response body");
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE blocks are separated by \n\n
+        let sep;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const block = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          if (!block.trim()) continue;
+
+          const lines = block.split("\n");
+          let event = "message";
+          let data = "";
+          for (const line of lines) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data += line.slice(5).trim();
+          }
+          let parsed;
+          try { parsed = JSON.parse(data); } catch { continue; }
+
+          if (event === "geocoded") {
+            setGeocode(parsed);
+          } else if (event === "agent_update") {
+            setAgentState(prev => ({
+              ...prev,
+              [parsed.agent]: { status: parsed.status, summary: parsed.summary },
+            }));
+          } else if (event === "complete") {
+            setDossier(parsed.dossier);
+          } else if (event === "error") {
+            setError(parsed.message || "Backend error");
+          }
+        }
+      }
+    } catch (e) {
+      if (e.name !== "AbortError") setError(e.message || String(e));
+    } finally {
+      setRunning(false);
+      abortRef.current = null;
+    }
+  }, [reset]);
+
+  return { start, reset, agentState, geocode, dossier, error, running };
+};
 
 // ── ICONS ──────────────────────────────────────────────────────────────────
 const Icon = ({ name, size = 16, color = "currentColor" }) => {
@@ -619,27 +712,34 @@ const SearchScreen = ({ onSubmit }) => {
 
 // ── AGENTS / MAP ───────────────────────────────────────────────────────────
 const AgentsScreen = ({ address, onComplete, dark }) => {
-  const [tick, setTick] = useState(0);
   const startedAt = useRef(Date.now());
   const [now, setNow] = useState(Date.now());
+  const { start, agentState, geocode, dossier, error, running } = useFloodAssessment();
 
   useEffect(() => {
-    let acc = 600;
-    const timers = AGENTS.map((_, i) => {
-      acc += AGENTS[i].delay;
-      return setTimeout(() => setTick(i+1), acc);
-    });
-    const completion = setTimeout(() => onComplete && onComplete(), acc + 700);
+    start(address);
     const tickClock = setInterval(() => setNow(Date.now()), 100);
-    return () => { timers.forEach(clearTimeout); clearTimeout(completion); clearInterval(tickClock); };
-  }, []);
+    return () => clearInterval(tickClock);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]);
+
+  // Once the backend emits the full dossier, hand it up.
+  useEffect(() => {
+    if (dossier && onComplete) onComplete(dossier);
+  }, [dossier, onComplete]);
 
   const total = AGENTS.length;
+  const doneCount = AGENTS.filter(a => agentState[a.id]?.status === "done").length;
+  const erroredCount = AGENTS.filter(a => agentState[a.id]?.status === "error").length;
+  const tick = doneCount + erroredCount;
   const progress = Math.min(tick / total, 1);
   const elapsed = ((now - startedAt.current)/1000).toFixed(1);
   const cute = ["humming…","sleuthing…","peeking…","scribbling…","triangulating…","double-checking…","sniffing the data…"];
 
-  const visiblePins = AGENTS.slice(0, tick).filter(a => a.pin);
+  // Pins surface for any agent that has reported done/error and has a pin.
+  const visiblePins = AGENTS
+    .filter(a => a.pin && (agentState[a.id]?.status === "done" || agentState[a.id]?.status === "working"))
+    .map((a, i) => ({ ...a, _idx: i }));
 
   return (
     <div className="screen agents-grid">
@@ -654,7 +754,12 @@ const AgentsScreen = ({ address, onComplete, dark }) => {
 
         <div className="agent-list">
           {AGENTS.map((a, i) => {
-            const status = i < tick ? "done" : i === tick ? "working" : "idle";
+            const live = agentState[a.id];
+            // Map backend statuses (working/done/error/queued) to the UI's
+            // visual states. Anything unreported is "idle".
+            const raw = live?.status || "idle";
+            const status = raw === "queued" ? "idle" : raw;
+            const summary = live?.summary;
             return (
               <div key={a.id} className="agent-item">
                 <div className="agent-head">
@@ -662,17 +767,22 @@ const AgentsScreen = ({ address, onComplete, dark }) => {
                   <span className="agent-name">{a.name}</span>
                   <span className={`agent-status ${status}`}>{status}</span>
                 </div>
-                {(status === "done" || status === "working") && (
+                {(status === "done" || status === "working" || status === "error") && (
                   <div className="agent-finding">
                     {status === "working"
-                      ? <span style={{color:"var(--ink-3)"}}>{cute[i % cute.length]}</span>
-                      : a.finding}
+                      ? <span style={{color:"var(--ink-3)"}}>{summary || cute[i % cute.length]}</span>
+                      : (summary || a.finding)}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+        {error && (
+          <div style={{marginTop: 12, padding: "10px 12px", background: "var(--coral-soft)", color: "var(--coral)", borderRadius: 8, fontSize: 12}}>
+            {error}
+          </div>
+        )}
 
         <div className="agents-foot">
           ORCHESTRATOR · gemma-4-31b-it · thinking=on<br/>
@@ -701,7 +811,9 @@ const AgentsScreen = ({ address, onComplete, dark }) => {
         {visiblePins.map((a, i) => <MapPin key={a.id} pin={a.pin} idx={i}/>)}
 
         <div className="map-overlay-tl">
-          41.8127°N · 87.6066°W<br/>
+          {geocode
+            ? `${Math.abs(geocode.lat).toFixed(4)}°${geocode.lat >= 0 ? "N" : "S"} · ${Math.abs(geocode.lon).toFixed(4)}°${geocode.lon >= 0 ? "E" : "W"}`
+            : "geocoding…"}<br/>
           ZOOM 16 · 500m radius
         </div>
         <div className="map-overlay-tr">
@@ -754,8 +866,127 @@ const RiskCircle = ({ score }) => {
   );
 };
 
-const DossierScreen = ({ onBack }) => {
-  const D = DOSSIER;
+// Map the live backend dossier shape onto the existing display shape.
+// Be defensive about missing fields — any individual agent could have errored.
+const mapDossier = (raw) => {
+  if (!raw) return DOSSIER;
+  const fema    = raw.fema    || {};
+  const local   = raw.local   || {};
+  const weather = raw.weather || {};
+  const news    = raw.news    || {};
+  const archive = raw.archive || {};
+  const risk    = raw.risk    || {};
+  const advisor = raw.advisor || {};
+
+  const score = Number.isFinite(risk.risk_score) ? Math.round(risk.risk_score) : 0;
+  const level = (risk.risk_level || (score >= 61 ? "high" : score >= 31 ? "medium" : "low")).toLowerCase();
+  const aep_pct = risk.aep_estimate != null ? +(risk.aep_estimate * 100).toFixed(2) : null;
+  const cum_pct = risk.mortgage_30yr_probability != null ? Math.round(risk.mortgage_30yr_probability * 100) : null;
+
+  // Headline framing — the FEMA-gap thesis kicks in when FEMA says "safe"
+  // but the risk agent disagrees.
+  const femaSaysSafe = fema.is_sfha === false;
+  const headline = (() => {
+    if (level === "high" && femaSaysSafe)
+      return { pre: "High urban flood risk —", em: "despite FEMA saying \"minimal\"" };
+    if (level === "high")
+      return { pre: "High flood risk —", em: "FEMA confirms a hazard zone" };
+    if (level === "medium" && femaSaysSafe)
+      return { pre: "Moderate risk that FEMA misses —", em: "urban flood signals are present" };
+    if (level === "medium")
+      return { pre: "Moderate flood risk", em: "" };
+    if (level === "low" && femaSaysSafe)
+      return { pre: "Low risk on this block —", em: "FEMA and local signals agree" };
+    return { pre: "Low risk", em: "" };
+  })();
+
+  const tags = [];
+  if (fema.flood_zone) tags.push({ label: `FEMA Zone ${fema.flood_zone}`, tone: fema.is_sfha ? "coral" : "amber" });
+  if (raw.city) tags.push({ label: raw.city, tone: "blue" });
+  if (raw.county) tags.push({ label: raw.county, tone: "neutral" });
+  if (local?.data_available && raw.city?.toLowerCase().includes("chicago")) tags.push({ label: "Combined sewer", tone: "neutral" });
+
+  const femaGapBody = [
+    risk.fema_gap_explanation,
+    fema.gap_warning,
+  ].filter(Boolean);
+
+  const gauge = weather.nearest_gauge || {};
+  const gaugeName = (gauge.site_name || "").split(" AT ")[0] || gauge.site_name || "—";
+  const gaugeHeight = gauge.current_gage_height_ft;
+
+  const infra = [
+    { label: "FEMA flood zone", val: fema.flood_zone || "—",
+      small: fema.is_sfha ? "Special Flood Hazard Area" : (fema.zone_description ? "outside SFHA" : null) },
+    { label: "Basement-flood 311 reports", val: local.basement_flooding_reports ?? "—",
+      small: local.data_available ? `${local?.raw?.years || 5}y · ${local?.raw?.radius_m || 500}m` : "no local dataset" },
+    { label: "Street-flood 311 reports", val: local.street_flooding_reports ?? "—" },
+    { label: "Nearest stream gauge", val: gaugeName,
+      small: gaugeHeight != null ? `${gaugeHeight} ft current` : null },
+    { label: "Active flood alerts", val: (weather.active_flood_alerts?.length ?? 0).toString(),
+      small: weather.near_term_concern ? `near-term: ${weather.near_term_concern}` : null },
+    { label: "River discharge trend", val: weather.river_discharge_trend || "—" },
+    { label: "Historical events (24mo)", val: archive.event_count != null ? String(archive.event_count) : "—",
+      small: archive.frequency_assessment ? archive.frequency_assessment : null },
+    { label: "FEMA panel", val: fema?.raw?.DFIRM_ID || "—" },
+  ];
+
+  const insurance = (advisor.insurance_recommendations || []).map(i => ({
+    type: (i.policy_type || "").toLowerCase().replace(/\s+/g, "_"),
+    name: i.policy_type || "Coverage option",
+    cost: i.estimated_cost || "—",
+    desc: i.covers || "",
+    why: i.rationale || "",
+    recommended: (i.priority || "").toLowerCase() === "essential",
+  }));
+
+  const actions = (advisor.mitigation_actions || []).map(a => ({
+    title: a.action || "Action",
+    cost: a.cost || "",
+    desc: a.first_step || "",
+    contact: null,
+  }));
+
+  // Surface advisor.key_resources as additional bottom rows.
+  const resourceRows = (advisor.key_resources || []).map(r => ({
+    title: r.name || "Resource",
+    cost: "info",
+    desc: r.what || "",
+    contact: r.contact_or_url || null,
+  }));
+
+  const newsItems = (news.articles || []).map(n => ({
+    date: n.date || "",
+    title: n.title || "",
+    source: n.source || "",
+    url: n.url || null,
+  }));
+
+  return {
+    score, level,
+    headline_pre: headline.pre,
+    headline_em: headline.em,
+    address: raw.address || "",
+    tags,
+    fema_gap: {
+      body: femaGapBody.length ? femaGapBody : ["The risk analyst did not produce a FEMA-gap narrative for this address."],
+      aep_pct: aep_pct ?? 0,
+      cum_pct: cum_pct ?? 0,
+      cum_label: "30-year mortgage",
+    },
+    infra,
+    insurance,
+    actions: [...actions, ...resourceRows],
+    news: newsItems,
+    risk_factors: risk.key_risk_factors || [],
+    mitigating_factors: risk.mitigating_factors || [],
+    reasoning_trace: risk.reasoning_trace || "",
+  };
+};
+
+const DossierScreen = ({ onBack, dossier }) => {
+  const D = useMemo(() => mapDossier(dossier), [dossier]);
+  const [showReasoning, setShowReasoning] = useState(false);
   return (
     <div className="screen dossier-wrap">
       <div className="dossier">
@@ -767,8 +998,10 @@ const DossierScreen = ({ onBack }) => {
         <div className="dossier-head">
           <RiskCircle score={D.score}/>
           <div className="risk-meta">
-            <span className="risk-tag coral">High risk · {D.score}/100</span>
-            <h2 className="risk-headline">{D.headline_pre} <em>{D.headline_em}</em></h2>
+            <span className={`risk-tag ${D.level === "high" ? "coral" : D.level === "medium" ? "amber" : "teal"}`}>
+              {D.level.charAt(0).toUpperCase() + D.level.slice(1)} risk · {D.score}/100
+            </span>
+            <h2 className="risk-headline">{D.headline_pre} {D.headline_em && <em>{D.headline_em}</em>}</h2>
             <div className="risk-addr">{D.address}</div>
             <div className="risk-tags">
               {D.tags.map((t,i) => <span key={i} className={`risk-tag ${t.tone}`}>{t.label}</span>)}
@@ -781,11 +1014,11 @@ const DossierScreen = ({ onBack }) => {
           icon={<Icon name="warn" color="var(--coral)" size={16}/>}
           iconBg="var(--coral-soft)"
           title="The FEMA gap"
-          badge={<span className="risk-tag coral">misleading</span>}>
+          badge={D.level === "low" ? null : <span className="risk-tag coral">misleading</span>}>
           {D.fema_gap.body.map((p,i) => <p key={i}>{p}</p>)}
           <div className="prob-block">
             <div className="prob-head">
-              <span className="prob-label">Probability of at least one basement flood over a {D.fema_gap.cum_label}</span>
+              <span className="prob-label">Probability of at least one flood over a {D.fema_gap.cum_label}</span>
               <span className="prob-pct">{D.fema_gap.cum_pct}%</span>
             </div>
             <div className="prob-bar"><div className="fill" style={{width: D.fema_gap.cum_pct + "%"}}/></div>
@@ -794,6 +1027,39 @@ const DossierScreen = ({ onBack }) => {
               <span>P = 1 − (1 − AEP)<sup>30</sup></span>
             </div>
           </div>
+          {(D.risk_factors.length > 0 || D.mitigating_factors.length > 0) && (
+            <div style={{marginTop: 16, display:"grid", gridTemplateColumns: "1fr 1fr", gap: 14}}>
+              {D.risk_factors.length > 0 && (
+                <div>
+                  <div className="stat-label" style={{marginBottom: 6}}>Key risk factors</div>
+                  <ul style={{margin: 0, paddingLeft: 16, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5}}>
+                    {D.risk_factors.map((f,i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
+              {D.mitigating_factors.length > 0 && (
+                <div>
+                  <div className="stat-label" style={{marginBottom: 6}}>Mitigating factors</div>
+                  <ul style={{margin: 0, paddingLeft: 16, fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5}}>
+                    {D.mitigating_factors.map((f,i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          {D.reasoning_trace && (
+            <div style={{marginTop: 18, padding: "12px 14px", background: "rgba(110,95,216,0.06)", border: "1px solid rgba(110,95,216,0.2)", borderRadius: 10}}>
+              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer"}} onClick={() => setShowReasoning(s => !s)}>
+                <div style={{display:"flex", alignItems:"center", gap: 8, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--purple)"}}>
+                  <span>◆ Gemma 4 reasoning trace</span>
+                </div>
+                <span style={{fontSize: 11, color: "var(--ink-3)"}}>{showReasoning ? "hide" : "show"}</span>
+              </div>
+              {showReasoning && (
+                <pre style={{marginTop: 12, marginBottom: 0, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.55, color: "var(--ink-2)", whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{D.reasoning_trace}</pre>
+              )}
+            </div>
+          )}
         </Section>
 
         <Section
@@ -815,18 +1081,21 @@ const DossierScreen = ({ onBack }) => {
           iconBg="var(--purple-soft)"
           title="Insurance guidance"
           badge={<span className="risk-tag teal">personalized</span>}>
-          <p>Federal law does <strong>not</strong> require flood insurance for Zone X, so most lenders won't ask. That's the gap. Given your block's actual flood mode (sewer backup, not riverine), the most cost-effective coverage starts with a sewer-backup rider on your existing homeowners policy.</p>
-          <div className="ins-grid">
-            {D.insurance.map((c,i) => (
-              <div key={i} className={"ins-card" + (c.recommended ? " recommended" : "")}>
-                {c.recommended && <span className="recbadge">recommended</span>}
-                <div className="ins-name">{c.name}</div>
-                <div className="ins-cost">{c.cost}</div>
-                <div className="ins-desc">{c.desc}</div>
-                <div className="ins-why">Why · {c.why}</div>
-              </div>
-            ))}
-          </div>
+          {D.insurance.length === 0 ? (
+            <p style={{color:"var(--ink-3)"}}>The advisor agent did not return insurance recommendations for this address.</p>
+          ) : (
+            <div className="ins-grid">
+              {D.insurance.map((c,i) => (
+                <div key={i} className={"ins-card" + (c.recommended ? " recommended" : "")}>
+                  {c.recommended && <span className="recbadge">recommended</span>}
+                  <div className="ins-name">{c.name}</div>
+                  <div className="ins-cost">{c.cost}</div>
+                  <div className="ins-desc">{c.desc}</div>
+                  <div className="ins-why">Why · {c.why}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </Section>
 
         <Section
@@ -851,13 +1120,20 @@ const DossierScreen = ({ onBack }) => {
           icon={<Icon name="news" color="var(--amber)" size={16}/>}
           iconBg="var(--amber-soft)"
           title="Recent local flood news">
-          {D.news.map((n,i) => (
-            <div key={i} className="news-row">
-              <span className="news-date">{n.date.toUpperCase()}</span>
-              <span className="news-title">{n.title}</span>
-              <span className="news-source">{n.source}</span>
-            </div>
-          ))}
+          {D.news.length === 0 ? (
+            <p style={{color:"var(--ink-3)"}}>No recent flood-related coverage surfaced for this area.</p>
+          ) : D.news.map((n,i) => {
+            const Inner = (
+              <>
+                <span className="news-date">{(n.date || "").toUpperCase()}</span>
+                <span className="news-title">{n.title}</span>
+                <span className="news-source">{n.source}</span>
+              </>
+            );
+            return n.url
+              ? <a key={i} className="news-row" href={n.url} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none", color:"inherit"}}>{Inner}</a>
+              : <div key={i} className="news-row">{Inner}</div>;
+          })}
         </Section>
 
         <div className="method-foot">
@@ -892,7 +1168,8 @@ const Chrome = ({ screen, onJump, dark, onToggleDark }) => (
 // ── APP ────────────────────────────────────────────────────────────────────
 const App = () => {
   const [screen, setScreen] = useState("search");
-  const [address, setAddress] = useState("4521 S Drexel Blvd, Chicago IL 60653");
+  const [address, setAddress] = useState("");
+  const [liveDossier, setLiveDossier] = useState(null);
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
@@ -900,16 +1177,22 @@ const App = () => {
   }, [dark]);
 
   const handleSubmit = (addr) => {
-    setAddress(addr.length > 36 ? addr : addr + " IL 60653");
+    setAddress(addr);
+    setLiveDossier(null);
     setScreen("agents");
+  };
+
+  const handleAgentsComplete = (dossier) => {
+    setLiveDossier(dossier);
+    setScreen("dossier");
   };
 
   return (
     <>
       <Chrome screen={screen} onJump={setScreen} dark={dark} onToggleDark={() => setDark(d => !d)}/>
       {screen === "search"  && <SearchScreen onSubmit={handleSubmit}/>}
-      {screen === "agents"  && <AgentsScreen address={address} dark={dark} onComplete={()=>setScreen("dossier")} />}
-      {screen === "dossier" && <DossierScreen onBack={()=>setScreen("search")} />}
+      {screen === "agents"  && <AgentsScreen address={address} dark={dark} onComplete={handleAgentsComplete} />}
+      {screen === "dossier" && <DossierScreen onBack={()=>setScreen("search")} dossier={liveDossier} />}
     </>
   );
 };
