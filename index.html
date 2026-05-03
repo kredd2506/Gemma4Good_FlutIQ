@@ -986,10 +986,14 @@ const mapDossier = (raw) => {
   const infra = [
     { label: "FEMA flood zone", val: fema.flood_zone || "—",
       small: fema.is_sfha ? "Special Flood Hazard Area" : (fema.zone_description ? "outside SFHA" : null) },
-    { label: "Basement-flood 311 reports", val: local.data_available ? (local.basement_flooding_reports ?? "—") : "—",
-      small: local.data_available ? `${local?.raw?.years || 5}y · ${local?.raw?.radius_m || 500}m` : "no 311 dataset wired for this city" },
-    { label: "Street-flood 311 reports", val: local.data_available ? (local.street_flooding_reports ?? "—") : "—",
-      small: local.data_available ? null : "no 311 dataset wired for this city" },
+    // 311 rows only appear when a city-specific 311 dataset is wired
+    // (currently Chicago only). For other cities we omit them entirely
+    // rather than showing empty dashes.
+    ...(local.data_available ? [
+      { label: "Basement-flood 311 reports", val: local.basement_flooding_reports ?? "—",
+        small: `${local?.raw?.years || 5}y · ${local?.raw?.radius_m || 500}m` },
+      { label: "Street-flood 311 reports", val: local.street_flooding_reports ?? "—" },
+    ] : []),
     { label: "Nearest stream gauge", val: gaugeName,
       small: gaugeHeight != null ? `${gaugeHeight} ft current` : null },
     { label: "Active flood alerts", val: (weather.active_flood_alerts?.length ?? 0).toString(),
