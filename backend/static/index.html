@@ -372,10 +372,23 @@
 <script type="text/babel">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-// Backend URL. Override at runtime via window.FLUTIQ_API or query string ?api=...
+// Backend URL.
+//   Default: same-origin ("") — works when FastAPI serves index.html
+//     itself (the bundled HF Space deploy).
+//   Override: window.FLUTIQ_API or ?api=... query string. Used during
+//     local dev when serving the HTML on a different port from the
+//     backend (e.g. python -m http.server 5173 → backend on :8000).
 const API_URL = (() => {
   const fromQuery = new URLSearchParams(window.location.search).get("api");
-  return fromQuery || window.FLUTIQ_API || "http://127.0.0.1:8000";
+  if (fromQuery) return fromQuery;
+  if (window.FLUTIQ_API) return window.FLUTIQ_API;
+  // Heuristic: if we're on an obviously-not-the-backend dev port, fall
+  // back to the local uvicorn default. Otherwise assume same origin.
+  const onDevHttpServer = (
+    (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") &&
+    window.location.port && window.location.port !== "8000"
+  );
+  return onDevHttpServer ? "http://127.0.0.1:8000" : "";
 })();
 
 // ── SSE hook ───────────────────────────────────────────────────────────────

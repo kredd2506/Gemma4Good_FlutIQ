@@ -122,12 +122,15 @@ backend/
 │   ├── smoke_test.py          basic + reasoning + tools, 3-way
 │   ├── smoke_test_tools.py    tool-call only, isolated
 │   └── smoke_tools.py         exercise each data tool end-to-end
-├── Dockerfile                 HF Spaces ready
+├── Dockerfile                 HF Spaces ready (COPYs app/ + static/)
 ├── requirements.txt
 ├── README.md                  HF Spaces frontmatter
+├── static/
+│   └── index.html             single-file React+Leaflet frontend
 └── .env (gitignored)          OPENROUTER_API_KEY
 
-index.html                     single-file React+Leaflet frontend
+README.md                      GitHub landing page
+DEPLOY.md                      step-by-step HF Spaces guide
 SKILL.md                       Claude Code skill, project rules
 FLOODIQ_BACKEND_SPEC.md        original 1086-line build spec
 flutiq-skill.tar               packaged skill bundle
@@ -207,27 +210,14 @@ learned implementing the spec"):
 
 Roughly in priority order. Nothing here is blocked on anyone but us.
 
-1. **Deploy** — backend to HF Spaces (Docker SDK, OPENROUTER_API_KEY
-   in secrets), frontend `index.html` to Cloudflare Pages with
-   `?api=https://kredd2506-flutiq.hf.space` query param. Estimated
-   time: ~30 min.
-2. **README rewrite** — public-facing, replaces the HF Spaces
-   frontmatter file in `backend/README.md` and adds a top-level
-   `README.md` for the GitHub landing page. Cover: what it does, how
-   to run locally, the architecture diagram, the FEMA-gap thesis,
-   credits.
-3. **Dossier polish** — open items from feedback:
-   - "FlutIQ" wordmark vs "FlutIQ" (rest of project) — pick one and
-     make it consistent
-   - Map legend still says "311 reports" generically; could remove
-     for non-Chicago
-   - The synthetic placeholder map (shown briefly during geocoding)
-     could just be a spinner
-4. **YouTube demo video** (≤3 min, storytelling-first per Kaggle rules).
+1. **Deploy to HF Spaces** — single Space serves both API and bundled
+   frontend. ~10 min, mostly clicks. Step-by-step in [DEPLOY.md](DEPLOY.md).
+2. **Update README** with the live demo URL once deployed.
+3. **YouTube demo video** (≤3 min, storytelling-first per Kaggle rules).
    Suggested arc: hook (FEMA missed Chicago basement floods) → walk
    through one assessment live → reasoning trace zoom-in → action plan
    on screen → repo + URL outro.
-5. **Kaggle Writeup** (≤1,500 words, Global Resilience track). Lead
+4. **Kaggle Writeup** (≤1,500 words, Global Resilience track). Lead
    with the FEMA-gap insight, then the 7-agent design, then Gemma 4
    reasoning showcase, then real-world resources (verified catalog,
    not invented products), then the wider playbook (other cities).
@@ -252,25 +242,23 @@ Roughly in priority order. Nothing here is blocked on anyone but us.
 
 ## Local dev quick reference
 
+Single uvicorn now serves both API and bundled frontend.
+
 ```bash
-# Backend
 cd backend
 python3.13 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 # put OPENROUTER_API_KEY=sk-or-v1-... in backend/.env (gitignored)
 set -a && source .env && set +a
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
-
-# Frontend (separate terminal)
-cd ..
-python3 -m http.server 5173 --bind 127.0.0.1
-# visit http://127.0.0.1:5173
+.venv/bin/uvicorn app.main:app --reload --port 8000
+# visit http://127.0.0.1:8000
 
 # Smoke tests
-cd backend
 PYTHONPATH=. .venv/bin/python scripts/smoke_test.py     # Gemma 4 sanity
 PYTHONPATH=. .venv/bin/python scripts/smoke_tools.py    # data tools
 ```
+
+For deploy → HF Spaces, see [DEPLOY.md](DEPLOY.md).
 
 ### Required: BYOK for OpenRouter
 

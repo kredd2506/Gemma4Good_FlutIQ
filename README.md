@@ -127,21 +127,22 @@ ring matching the agents' query parameters.
 
 ```bash
 git clone https://github.com/kredd2506/Gemma4Good_FlutIQ
-cd Gemma4Good_FlutIQ
+cd Gemma4Good_FlutIQ/backend
 
-# Backend
-cd backend
 python3.13 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 echo 'OPENROUTER_API_KEY=sk-or-v1-...' > .env   # see "BYOK" note below
 set -a && source .env && set +a
 .venv/bin/uvicorn app.main:app --port 8000
 
-# Frontend (separate terminal, from repo root)
-python3 -m http.server 5173
-
-# Open http://127.0.0.1:5173
+# Open http://127.0.0.1:8000
 ```
+
+FastAPI serves both the API (`/api/*`) and the bundled frontend
+(`/`) on a single port. No separate frontend dev server needed.
+
+For deploy instructions (Hugging Face Spaces, ~10 min) see
+[DEPLOY.md](DEPLOY.md).
 
 ### BYOK (bring your own key) is required
 
@@ -224,7 +225,7 @@ backend/
 ├── requirements.txt
 └── README.md                  HF Spaces frontmatter
 
-index.html                     single-file React + Leaflet frontend
+backend/static/index.html      single-file React + Leaflet frontend (served by FastAPI)
 SKILL.md                       Claude Code skill (project rules)
 STATUS.md                      detailed working snapshot
 FLOODIQ_BACKEND_SPEC.md        original 1086-line build spec
