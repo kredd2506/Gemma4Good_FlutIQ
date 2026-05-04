@@ -41,11 +41,9 @@ async def run_risk_agent(
     language: str = "en",
     streetview_image_data_url: Optional[str] = None,
     satellite_image_data_url: Optional[str] = None,
-    topo_image_data_url: Optional[str] = None,
 ) -> dict:
     image_data_urls = [
         ("satellite", satellite_image_data_url),
-        ("topo",      topo_image_data_url),
         ("streetview", streetview_image_data_url),
     ]
     image_data_urls = [(k, u) for k, u in image_data_urls if u]
@@ -63,32 +61,22 @@ async def run_risk_agent(
         if "satellite" in image_kinds:
             labels.append(f"image {len(labels)+1} = SATELLITE VIEW (bird's-eye)")
             descriptions.append(
-                "- SATELLITE: estimate the impervious-surface percentage of the lot "
-                "and the surrounding block (concrete/asphalt vs vegetation), the "
-                "building-footprint-to-lot ratio, proximity to visible water bodies "
-                "or drainage channels, and how the surrounding properties are "
-                "surfaced (catchment effect)."
-            )
-        if "topo" in image_kinds:
-            labels.append(f"image {len(labels)+1} = WIDER-AREA CONTEXT MAP")
-            descriptions.append(
-                "- WIDER-AREA CONTEXT MAP: Mapbox outdoors style at a wider zoom. "
-                "Note that in dense urban areas this image typically does NOT show "
-                "elevation contour lines. What it DOES show: named waterways "
-                "(creeks, rivers, drainage channels — drawn in blue), parks and "
-                "green spaces (green), mapped retention basins or detention "
-                "ponds if any, named streets, and distance context to all of "
-                "the above. Use it to reason about drainage proximity and "
-                "regional context, NOT to claim micro-elevation observations "
-                "you can't actually see."
+                "- SATELLITE: a dedicated satellite agent has already analyzed "
+                "this image and produced structured findings (impervious_estimate_pct, "
+                "indicators with bounding boxes, catchment_assessment, etc.) — see "
+                "the 'Satellite Visual Analysis' section below. Look at the image "
+                "yourself to verify or extend those findings: the property is at "
+                "the CENTER of the frame; everything around it is the catchment."
             )
         if "streetview" in image_kinds:
             labels.append(f"image {len(labels)+1} = STREET VIEW (eye-level)")
             descriptions.append(
-                "- STREET VIEW: lot elevation vs street grade, basement-level windows, "
-                "below-grade entries, downspout connections (to ground vs to sewer), "
-                "ground-floor HVAC/electrical, evidence of prior water damage, "
-                "impervious surfaces visible at eye level."
+                "- STREET VIEW: a dedicated streetview agent has already analyzed "
+                "this image and produced indicators with bounding boxes — see "
+                "'Street View Visual Analysis' below. Look at the image yourself "
+                "to verify lot elevation vs street grade, basement-level windows, "
+                "below-grade entries, downspout connections, ground-floor HVAC, "
+                "and evidence of prior water damage."
             )
         labels_block = "\n".join(f"  · {l}" for l in labels)
         desc_block = "\n".join(descriptions)
@@ -103,7 +91,7 @@ Cross-reference what you see across the images. When evidence from
 one view corroborates or contradicts another view, OR when visual
 evidence corroborates or contradicts the data, say so explicitly in
 your reasoning. Reference images by name ("from the satellite I can
-see...", "the topo contours show...", "in the street view...").
+see...", "in the street view...").
 """
 
     text_prompt = f"""You are analyzing flood risk for: {address} ({lat}, {lon})
@@ -118,6 +106,9 @@ Here is all the data collected by our investigation team:
 
 ## Street View Visual Analysis (from the streetview agent)
 {json.dumps({k: v for k, v in (all_data.get('streetview') or {}).items() if k != 'image_data_url'}, indent=2, default=str)}
+
+## Satellite Visual Analysis (from the satellite agent)
+{json.dumps({k: v for k, v in (all_data.get('satellite') or {}).items() if k != 'image_data_url'}, indent=2, default=str)}
 
 ## Weather & Hydrology Findings
 {json.dumps(all_data.get('weather', {}), indent=2, default=str)}

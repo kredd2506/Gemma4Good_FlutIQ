@@ -22,10 +22,10 @@ from app.agents.fema_agent import run_fema_agent
 from app.agents.local_agent import run_local_agent
 from app.agents.news_agent import run_news_agent
 from app.agents.risk_agent import run_risk_agent
+from app.agents.satellite_agent import run_satellite_agent
 from app.agents.streetview_agent import run_streetview_agent
 from app.agents.weather_agent import run_weather_agent
 from app.tools.geocoder import geocode_address
-from app.tools.mapbox import get_satellite_image, get_topo_image
 
 
 GeoCtx = dict
@@ -58,7 +58,7 @@ async def _archive(ctx: GeoCtx) -> dict:
     )
 
 
-# The streetview agent needs language for its summary copy. Curried in
+# The vision agents need language for their summary copy. Curried in
 # at agent-pack-construction time below.
 def _make_streetview(language: str) -> AgentFn:
     async def _run(ctx: GeoCtx) -> dict:
@@ -69,8 +69,19 @@ def _make_streetview(language: str) -> AgentFn:
     return _run
 
 
+def _make_satellite(language: str) -> AgentFn:
+    async def _run(ctx: GeoCtx) -> dict:
+        return await run_satellite_agent(
+            ctx["lat"], ctx["lon"], ctx.get("display_name", ""),
+            language=language,
+        )
+    return _run
+
+
 # Order here is the order the frontend renders agent rows in.
-# streetview is the only multimodal one — placed last in the data row.
+# The two vision agents (streetview eye-level + satellite bird's-eye)
+# are placed last in the data row so users see the slower vision
+# calls finishing after the cheap text-API calls.
 def _data_agents_for(language: str) -> dict[str, AgentFn]:
     return {
         "fema": _fema,
@@ -78,6 +89,7 @@ def _data_agents_for(language: str) -> dict[str, AgentFn]:
         "weather": _weather,
         "news": _news,
         "archive": _archive,
+        "satellite": _make_satellite(language),
         "streetview": _make_streetview(language),
     }
 
@@ -137,14 +149,9 @@ async def run_assessment(
         "summary": "Waiting on risk analysis...",
     })
 
-    # Map images for the multimodal risk analyst — pure HTTP, no LLM.
-    # Kicked off alongside the data agents so the latency hides under
-    # the slowest agent's wait. Both return None silently if Mapbox is
-    # not configured (graceful degrade).
-    satellite_task = asyncio.create_task(get_satellite_image(geo["lat"], geo["lon"]))
-    topo_task = asyncio.create_task(get_topo_image(geo["lat"], geo["lon"]))
-
     # Run data agents in parallel; stream results in completion order.
+    # The satellite + streetview agents now own their own image fetches
+    # (Mapbox + Google), so no separate map prefetch step here.
     tasks = {name: asyncio.create_task(fn(ctx)) for name, fn in data_agents.items()}
     task_to_name = {t: n for n, t in tasks.items()}
     pending = set(tasks.values())
@@ -176,41 +183,26 @@ async def run_assessment(
         "status": "working",
         "summary": "Synthesizing risk score with reasoning mode...",
     })
-    # Wait for the map images we kicked off earlier. Each returns None
-    # if Mapbox isn't configured or the fetch failed.
-    satellite_meta = None
-    topo_meta = None
-    try:
-        satellite_meta = await satellite_task
-    except Exception:
-        satellite_meta = None
-    try:
-        topo_meta = await topo_task
-    except Exception:
-        topo_meta = None
-
-    # Stash on results so the dossier's UI can render thumbnails.
-    if satellite_meta or topo_meta:
-        results["maps"] = {
-            "satellite": satellite_meta,
-            "topo": topo_meta,
-        }
-
-    # If the streetview agent succeeded, hand its image to the risk
-    # analyst so the analyst can do its own visual reasoning instead
-    # of just reading another agent's text findings. v0.9 multimodal.
+    # The two vision agents own their own images. Pull the data URLs
+    # back out of their results so the risk analyst can do cross-modal
+    # reasoning over the raw images alongside the structured text
+    # findings each agent produced.
     sv_image_data_url = None
     sv_result = results.get("streetview") or {}
     if sv_result.get("available"):
         sv_image_data_url = sv_result.get("image_data_url")
+
+    sat_image_data_url = None
+    sat_result = results.get("satellite") or {}
+    if sat_result.get("available"):
+        sat_image_data_url = sat_result.get("image_data_url")
 
     try:
         risk_result = await run_risk_agent(
             results, geo["lat"], geo["lon"], geo["display_name"],
             language=language,
             streetview_image_data_url=sv_image_data_url,
-            satellite_image_data_url=(satellite_meta or {}).get("data_url"),
-            topo_image_data_url=(topo_meta or {}).get("data_url"),
+            satellite_image_data_url=sat_image_data_url,
         )
         results["risk"] = risk_result
         yield sse("agent_update", {
@@ -267,7 +259,7 @@ def _compile_dossier(geo: GeoCtx, results: dict) -> dict:
         "news": results.get("news", {}),
         "archive": results.get("archive", {}),
         "streetview": results.get("streetview", {}),
-        "maps": results.get("maps", {}),
+        "satellite": results.get("satellite", {}),
         "risk": results.get("risk", {}),
         "advisor": results.get("advisor", {}),
     }

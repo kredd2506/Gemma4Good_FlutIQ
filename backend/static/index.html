@@ -1115,7 +1115,7 @@ const mapDossier = (raw) => {
     images_used: risk.images_used || [],
     advisor_tldr,
     streetview: raw.streetview || {},
-    maps: raw.maps || {},
+    satellite: raw.satellite || {},
   };
 };
 
@@ -1211,23 +1211,20 @@ const DossierScreen = ({ onBack, dossier }) => {
           )}
         </Section>
 
-        {(D.streetview?.available || D.maps?.satellite || D.maps?.topo) && (() => {
+        {(D.streetview?.available || D.satellite?.available) && (() => {
           const tabs = [
             D.streetview?.available && {key:"streetview", label:"Street level", source:"Google"},
-            D.maps?.satellite       && {key:"satellite",  label:"Satellite",    source:"Mapbox"},
-            D.maps?.topo            && {key:"topo",       label:"Wider area",   source:"Mapbox"},
+            D.satellite?.available  && {key:"satellite",  label:"Satellite",    source:"Mapbox"},
           ].filter(Boolean);
-          // Auto-correct selection if current tab isn't available.
           const activeKey = tabs.find(t => t.key === imageTab) ? imageTab : tabs[0]?.key;
-          const activeSrc = activeKey === "streetview" ? D.streetview.image_data_url
-                         : activeKey === "satellite"  ? D.maps.satellite.data_url
-                         : activeKey === "topo"       ? D.maps.topo.data_url
-                         : null;
+          const active = activeKey === "streetview" ? D.streetview
+                       : activeKey === "satellite"  ? D.satellite
+                       : null;
           const activeAlt = activeKey === "streetview" ? "Google Street View of the property"
-                         : activeKey === "satellite"  ? "Mapbox satellite view of the property"
-                         : activeKey === "topo"       ? "Mapbox wider-area context map of the property"
+                         : activeKey === "satellite"  ? "Mapbox satellite view of the property + surrounding catchment"
                          : "";
-          const showOverlay = activeKey === "streetview" && showBoxes && D.streetview.indicators?.some(i => i.box_2d);
+          const indicatorsWithBoxes = (active?.indicators || []).filter(i => i.box_2d);
+          const showOverlay = showBoxes && indicatorsWithBoxes.length > 0;
         return (
           <Section
             num="§03"
@@ -1260,7 +1257,7 @@ const DossierScreen = ({ onBack, dossier }) => {
                 )}
                 <div style={{position:"relative", borderRadius:10, overflow:"hidden", border:"1px solid var(--line)", lineHeight:0}}>
                   <img
-                    src={activeSrc}
+                    src={active.image_data_url}
                     alt={activeAlt}
                     style={{width:"100%", display:"block"}}
                   />
@@ -1270,7 +1267,7 @@ const DossierScreen = ({ onBack, dossier }) => {
                       preserveAspectRatio="none"
                       style={{position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none"}}
                     >
-                      {D.streetview.indicators.filter(i => i.box_2d).map((ind, i) => {
+                      {indicatorsWithBoxes.map((ind, i) => {
                         const [y1, x1, y2, x2] = ind.box_2d;
                         const w = x2 - x1, h = y2 - y1;
                         const sev = (ind.severity || "").toLowerCase();
@@ -1313,7 +1310,7 @@ const DossierScreen = ({ onBack, dossier }) => {
                     </svg>
                   )}
                 </div>
-                {activeKey === "streetview" && D.streetview.indicators?.some(i => i.box_2d) && (
+                {indicatorsWithBoxes.length > 0 && (
                   <button
                     onClick={() => setShowBoxes(s => !s)}
                     style={{
@@ -1323,42 +1320,55 @@ const DossierScreen = ({ onBack, dossier }) => {
                       borderRadius:6, padding:"4px 10px", color:"var(--ink-2)", cursor:"pointer",
                     }}
                   >
-                    {showBoxes ? "hide" : "show"} {D.streetview.indicators.filter(i => i.box_2d).length} box{D.streetview.indicators.filter(i => i.box_2d).length === 1 ? "" : "es"}
+                    {showBoxes ? "hide" : "show"} {indicatorsWithBoxes.length} box{indicatorsWithBoxes.length === 1 ? "" : "es"}
                   </button>
                 )}
                 <div style={{fontSize:11, color:"var(--ink-4)", marginTop:6, fontFamily:"'JetBrains Mono', monospace"}}>
                   {activeKey === "streetview" && (
-                    <>{D.streetview.copyright || "© Google"}
-                      {D.streetview.capture_date && ` · captured ${D.streetview.capture_date}`}
-                      {D.streetview.pano_distance_m != null && ` · ${D.streetview.pano_distance_m}m from address`}
+                    <>{active.copyright || "© Google"}
+                      {active.capture_date && ` · captured ${active.capture_date}`}
+                      {active.pano_distance_m != null && ` · ${active.pano_distance_m}m from address`}
                     </>
                   )}
                   {activeKey === "satellite" && (
-                    <>© Mapbox · © OpenStreetMap · zoom {D.maps.satellite.zoom}</>
-                  )}
-                  {activeKey === "topo" && (
-                    <>© Mapbox · © OpenStreetMap · zoom {D.maps.topo.zoom}</>
+                    <>© Mapbox · © OpenStreetMap · {active.style} · zoom {active.zoom}</>
                   )}
                 </div>
               </div>
               <div>
                 <p style={{margin:"0 0 10px"}}>
-                  We fed this Street View frame to Gemma 4 with vision turned on
-                  and asked it to flag visible flood-risk indicators. The model
-                  was instructed not to fabricate features it couldn't actually see.
+                  {activeKey === "streetview" ? (
+                    <>The <strong>street-view agent</strong> ran Gemma 4 vision on this eye-level photo, looking for ground-floor flood-risk indicators (basement windows, downspouts, lot grade, evidence of prior damage). The model was instructed not to fabricate features it couldn't see.</>
+                  ) : (
+                    <>The <strong>satellite agent</strong> ran Gemma 4 vision on this bird's-eye image of the property and its surrounding block, looking for catchment-scale signals: impervious surface, building footprint, drainage features, and adjacent land use that drains TO this property.</>
+                  )}
                 </p>
                 <div style={{display:"flex", gap:8, flexWrap:"wrap", marginBottom:12, fontSize:12}}>
-                  <span className={`risk-tag ${D.streetview.overall_visual_risk === "high" ? "coral" : D.streetview.overall_visual_risk === "moderate" ? "amber" : "teal"}`}>
-                    visual risk: {D.streetview.overall_visual_risk || "unclear"}
+                  <span className={`risk-tag ${active.overall_visual_risk === "high" ? "coral" : active.overall_visual_risk === "moderate" ? "amber" : "teal"}`}>
+                    visual risk: {active.overall_visual_risk || "unclear"}
                   </span>
-                  {D.streetview.elevation_vs_street && D.streetview.elevation_vs_street !== "unclear" && (
-                    <span className="risk-tag neutral">{D.streetview.elevation_vs_street.replace(/_/g, " ")}</span>
+                  {activeKey === "streetview" && active.elevation_vs_street && active.elevation_vs_street !== "unclear" && (
+                    <span className="risk-tag neutral">{active.elevation_vs_street.replace(/_/g, " ")}</span>
                   )}
-                  <span className="risk-tag neutral">confidence: {D.streetview.confidence || "unknown"}</span>
+                  {activeKey === "satellite" && active.impervious_estimate_pct != null && (
+                    <span className="risk-tag neutral">impervious ≈ {active.impervious_estimate_pct}%</span>
+                  )}
+                  {activeKey === "satellite" && active.building_footprint_pct != null && (
+                    <span className="risk-tag neutral">building ≈ {active.building_footprint_pct}% of lot</span>
+                  )}
+                  {activeKey === "satellite" && active.vegetation_buffer && (
+                    <span className="risk-tag neutral">vegetation: {active.vegetation_buffer}</span>
+                  )}
+                  <span className="risk-tag neutral">confidence: {active.confidence || "unknown"}</span>
                 </div>
-                {D.streetview.indicators?.length > 0 ? (
+                {activeKey === "satellite" && active.catchment_assessment && (
+                  <p style={{margin:"0 0 10px", fontSize:13, color:"var(--ink-2)", lineHeight:1.55, padding:"8px 10px", background:"var(--bg)", borderLeft:"3px solid var(--accent)", borderRadius:4}}>
+                    <strong style={{color:"var(--accent)"}}>Catchment · </strong>{active.catchment_assessment}
+                  </p>
+                )}
+                {(active.indicators || []).length > 0 ? (
                   <ol style={{margin:0, paddingLeft:0, listStyle:"none", fontSize:13, color:"var(--ink-2)", lineHeight:1.55}}>
-                    {D.streetview.indicators.map((ind, i) => {
+                    {active.indicators.map((ind, i) => {
                       const sev = (ind.severity || "").toLowerCase();
                       const color = sev === "high" ? "var(--coral)"
                                   : sev === "moderate" ? "var(--amber)"
@@ -1374,6 +1384,7 @@ const DossierScreen = ({ onBack, dossier }) => {
                           }}>{i+1}</span>
                           <div>
                             <strong>{ind.feature}</strong>
+                            {ind.category && <span className="small" style={{marginLeft:6, color:"var(--ink-4)"}}> · {ind.category}</span>}
                             {ind.severity && <span className="small" style={{marginLeft:6}}> · {ind.severity}</span>}
                             {!ind.box_2d && <span className="small" style={{marginLeft:6, color:"var(--ink-4)"}}> · no box</span>}
                             <div style={{color:"var(--ink-3)", fontSize:12, marginTop:2}}>{ind.risk_implication}</div>
@@ -1384,7 +1395,7 @@ const DossierScreen = ({ onBack, dossier }) => {
                   </ol>
                 ) : (
                   <p style={{color:"var(--ink-3)", fontSize:13, margin:0}}>
-                    {D.streetview.summary || "No specific indicators visible from the available angle."}
+                    {active.summary || "No specific indicators visible."}
                   </p>
                 )}
               </div>
@@ -1394,7 +1405,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         })()}
 
         <Section
-          num={(D.streetview?.available || D.maps?.satellite || D.maps?.topo) ? "§04" : "§03"}
+          num={(D.streetview?.available || D.satellite?.available) ? "§04" : "§03"}
           icon={<Icon name="warn" color="var(--coral)" size={16}/>}
           iconBg="var(--coral-soft)"
           title="Why FEMA's flood map isn't the whole story"
@@ -1433,7 +1444,7 @@ const DossierScreen = ({ onBack, dossier }) => {
             </div>
           )}
           {(D.visual_corroboration || D.used_streetview_image || (D.images_used && D.images_used.length > 0)) && (() => {
-            const _imgLabel = {streetview: "street view", satellite: "satellite", topo: "wider-area map"};
+            const _imgLabel = {streetview: "street view", satellite: "satellite"};
             const usedImages = (D.images_used || []).map(k => _imgLabel[k] || k);
             const imgPart = usedImages.length === 0
               ? "no images"
@@ -1474,7 +1485,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num={(D.streetview?.available || D.maps?.satellite || D.maps?.topo) ? "§05" : "§04"}
+          num={(D.streetview?.available || D.satellite?.available) ? "§05" : "§04"}
           icon={<Icon name="drop" color="var(--accent)" size={16}/>}
           iconBg="var(--accent-soft)"
           title="The raw signals we looked at"
@@ -1488,7 +1499,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num={(D.streetview?.available || D.maps?.satellite || D.maps?.topo) ? "§06" : "§05"}
+          num={(D.streetview?.available || D.satellite?.available) ? "§06" : "§05"}
           icon={<Icon name="news" color="var(--amber)" size={16}/>}
           iconBg="var(--amber-soft)"
           title="Recent local flood news">
@@ -1523,7 +1534,7 @@ const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
       <span>FlutIQ</span>
-      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.10 · beta</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.11 · beta</span>
     </div>
     <div className="chrome-meta">
       <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>
