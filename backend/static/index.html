@@ -1116,6 +1116,7 @@ const mapDossier = (raw) => {
     advisor_tldr,
     streetview: raw.streetview || {},
     satellite: raw.satellite || {},
+    local: raw.local || {},
   };
 };
 
@@ -1469,6 +1470,65 @@ const DossierScreen = ({ onBack, dossier }) => {
             </div>
             );
           })()}
+          {(D.local?.construction || D.local?.compound_signal) && (() => {
+            const con = D.local.construction || {};
+            const compound = D.local.compound_signal;
+            const major = (D.local.raw_construction || {}).major_projects || [];
+            const total = D.local.raw_construction?.total_reported_cost || con.total_cost;
+            const trend = con.trend_direction || D.local.raw_construction?.trend?.direction;
+            const concern = (con.concern_level || "").toLowerCase();
+            const concernColor = concern === "high" ? "var(--coral)"
+                              : concern === "moderate" ? "var(--amber)"
+                              : "var(--teal)";
+            const trendIcon = trend === "increasing" ? "↑" : trend === "decreasing" ? "↓" : "→";
+            return (
+            <div style={{marginTop: 12, padding: "14px 16px", background: "rgba(238,106,61,0.05)", border: "1px solid rgba(238,106,61,0.22)", borderRadius: 10}}>
+              <div style={{display:"flex", alignItems:"center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--coral)", marginBottom: 8, flexWrap:"wrap"}}>
+                <span>⊕ Development pressure</span>
+                <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· what's being built around you, in real time</span>
+              </div>
+              {compound && (
+                <p style={{margin: "0 0 10px", fontSize: 14, lineHeight: 1.55, color: "var(--ink)"}}>
+                  <em>{compound}</em>
+                </p>
+              )}
+              <div style={{display:"flex", gap:8, flexWrap:"wrap", fontSize: 12, marginBottom: 10}}>
+                {con.permits_count != null && (
+                  <span className="risk-tag neutral">{con.permits_count} permits · 1km · 3y</span>
+                )}
+                {con.new_construction_count != null && (
+                  <span className="risk-tag neutral">{con.new_construction_count} new builds</span>
+                )}
+                {total != null && (
+                  <span className="risk-tag neutral">${(total/1_000_000).toFixed(1)}M total</span>
+                )}
+                {trend && (
+                  <span className="risk-tag neutral">{trendIcon} {trend}</span>
+                )}
+                {concern && (
+                  <span className="risk-tag" style={{background: `${concernColor}1A`, color: concernColor, border: `1px solid ${concernColor}55`}}>concern: {concern}</span>
+                )}
+              </div>
+              {con.interpretation && (
+                <p style={{margin:"0 0 10px", fontSize:13, color:"var(--ink-2)", lineHeight:1.55}}>{con.interpretation}</p>
+              )}
+              {major.length > 0 && (
+                <div>
+                  <div className="stat-label" style={{marginBottom: 6}}>Largest projects within 1km</div>
+                  <ol style={{margin:0, paddingLeft:0, listStyle:"none", fontSize:12, color:"var(--ink-2)", lineHeight:1.5}}>
+                    {major.slice(0, 5).map((p, i) => (
+                      <li key={i} style={{marginBottom:6, display:"grid", gridTemplateColumns:"110px 70px 1fr", gap:10, alignItems:"baseline"}}>
+                        <span style={{fontFamily:"'JetBrains Mono', monospace", color:"var(--coral)", fontWeight:600}}>${(p.cost/1_000_000).toFixed(1)}M</span>
+                        <span style={{fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"var(--ink-3)"}}>{(p.date || "").slice(0,7)}</span>
+                        <span><strong style={{textTransform:"capitalize"}}>{p.type}</strong> · {p.address || ""}<span style={{color:"var(--ink-3)"}}> — {(p.description || "").slice(0,90)}</span></span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+            );
+          })()}
           {D.reasoning_trace && (
             <div style={{marginTop: 12, padding: "12px 14px", background: "rgba(110,95,216,0.06)", border: "1px solid rgba(110,95,216,0.2)", borderRadius: 10}}>
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer"}} onClick={() => setShowReasoning(s => !s)}>
@@ -1534,7 +1594,7 @@ const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
       <span>FlutIQ</span>
-      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.11 · beta</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.12 · beta</span>
     </div>
     <div className="chrome-meta">
       <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>
