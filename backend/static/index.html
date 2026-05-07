@@ -540,6 +540,12 @@ const AGENTS = [
   { id: "archive", name: "Archivist",
     finding: "Cook County: 11 NOAA flood events in 10yr, 4 FEMA disaster declarations. 2008, 2013, 2020, 2023 caused widespread basement flooding.",
     pin: { x: 62, y: 70, label: "11 events / 10y", tone: "amber" }, delay: 1100 },
+  { id: "regional", name: "Regional risk analyst",
+    finding: "FEMA NRI county-level multi-hazard profile — wildfire, hurricane, tornado, earthquake, etc. — for the wider neighborhood.",
+    pin: null, delay: 1300 },
+  { id: "satellite", name: "Satellite surveyor",
+    finding: "Multimodal: bird's-eye Mapbox imagery → Gemma 4 vision → impervious-surface and catchment analysis.",
+    pin: null, delay: 1700 },
   { id: "streetview", name: "Streetview surveyor",
     finding: "Multimodal: feeding Google Street View imagery to Gemma 4 vision to spot ground-floor flood-risk indicators.",
     pin: null, delay: 1800 },
@@ -1117,12 +1123,29 @@ const mapDossier = (raw) => {
     streetview: raw.streetview || {},
     satellite: raw.satellite || {},
     local: raw.local || {},
+    regional: raw.regional || {},
   };
 };
 
 const DossierScreen = ({ onBack, dossier }) => {
   const D = useMemo(() => mapDossier(dossier), [dossier]);
   const [showReasoning, setShowReasoning] = useState(false);
+
+  // Section numbers depend on which conditional sections render. We
+  // precompute them so the rendering JSX stays readable.
+  const _sectionNums = useMemo(() => {
+    const hasImages   = D.streetview?.available || D.satellite?.available;
+    const hasRegional = D.regional?.available;
+    let n = 2;  // §01 actions, §02 insurance fixed
+    const fmt = () => "§" + String(++n).padStart(2, "0");
+    return {
+      images:   hasImages   ? fmt() : null,
+      gap:      fmt(),
+      regional: hasRegional ? fmt() : null,
+      signals:  fmt(),
+      news:     fmt(),
+    };
+  }, [D]);
   const [showBoxes, setShowBoxes] = useState(true);
   const [imageTab, setImageTab] = useState("streetview");  // "streetview" | "satellite" | "topo"
   return (
@@ -1228,7 +1251,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           const showOverlay = showBoxes && indicatorsWithBoxes.length > 0;
         return (
           <Section
-            num="§03"
+            num={_sectionNums.images || "§03"}
             icon={<Icon name="pin" color="var(--accent)" size={16}/>}
             iconBg="var(--accent-soft)"
             title="What we saw at the property"
@@ -1406,7 +1429,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         })()}
 
         <Section
-          num={(D.streetview?.available || D.satellite?.available) ? "§04" : "§03"}
+          num={_sectionNums.gap}
           icon={<Icon name="warn" color="var(--coral)" size={16}/>}
           iconBg="var(--coral-soft)"
           title="Why FEMA's flood map isn't the whole story"
@@ -1544,8 +1567,90 @@ const DossierScreen = ({ onBack, dossier }) => {
           )}
         </Section>
 
+        {D.regional?.available && (
+          <Section
+            num={_sectionNums.regional}
+            icon={<Icon name="warn" color="var(--purple)" size={16}/>}
+            iconBg="var(--purple-soft)"
+            title="Wider neighborhood — beyond just flooding"
+            badge={<span className="risk-tag purple">FEMA NRI · county-level</span>}>
+            <p style={{color:"var(--ink-2)", marginTop:0}}>
+              FlutIQ is flood-focused, but your county faces other hazards too. This is FEMA's
+              National Risk Index for {D.regional.nri?.county} {D.regional.nri?.state}
+              {D.regional.nri?.population ? ` (pop. ${D.regional.nri.population.toLocaleString()})` : ""},
+              calibrated against every other US county.
+            </p>
+            <div style={{display:"flex", gap:8, flexWrap:"wrap", margin:"12px 0", fontSize:12}}>
+              {D.regional.nri?.composite_risk_rating && (
+                <span className={`risk-tag ${
+                  D.regional.nri.composite_risk_rating.includes("Very High") ? "coral"
+                  : D.regional.nri.composite_risk_rating.includes("High") ? "amber"
+                  : D.regional.nri.composite_risk_rating.includes("Moderate") ? "amber"
+                  : "teal"
+                }`}>
+                  Composite: {D.regional.nri.composite_risk_rating} ({D.regional.nri.composite_risk_score}/100)
+                </span>
+              )}
+              {D.regional.nri?.expected_annual_loss_usd != null && (
+                <span className="risk-tag neutral">
+                  Expected annual loss: ${(D.regional.nri.expected_annual_loss_usd / 1_000_000).toFixed(0)}M
+                </span>
+              )}
+              {D.regional.nri?.social_vulnerability_rating && (
+                <span className="risk-tag neutral">SoVI: {D.regional.nri.social_vulnerability_rating}</span>
+              )}
+              {D.regional.nri?.community_resilience_rating && (
+                <span className="risk-tag neutral">Resilience: {D.regional.nri.community_resilience_rating}</span>
+              )}
+            </div>
+            {Array.isArray(D.regional.headline_hazards) && D.regional.headline_hazards.length > 0 && (
+              <div style={{marginBottom:12}}>
+                <div className="stat-label" style={{marginBottom:8}}>Headline hazards for this county</div>
+                <ol style={{margin:0, paddingLeft:0, listStyle:"none", fontSize:13, color:"var(--ink-2)", lineHeight:1.55}}>
+                  {D.regional.headline_hazards.map((h, i) => {
+                    const r = (h.rating || "").toLowerCase();
+                    const color = r.includes("very high") ? "var(--coral)"
+                                : r.includes("high") ? "var(--amber)"
+                                : r.includes("moderate") ? "var(--amber)"
+                                : "var(--teal)";
+                    return (
+                      <li key={i} style={{marginBottom:10, display:"flex", gap:10}}>
+                        <span style={{
+                          flexShrink:0, width:22, height:22, borderRadius:4,
+                          background:color, color:"white", fontSize:12, fontWeight:600,
+                          fontFamily:"'JetBrains Mono', monospace",
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                        }}>{i+1}</span>
+                        <div>
+                          <strong>{h.name}</strong>
+                          {h.rating && <span className="small" style={{marginLeft:6}}> · {h.rating}</span>}
+                          {h.score != null && <span className="small" style={{marginLeft:6, color:"var(--ink-4)"}}> · score {h.score}</span>}
+                          <div style={{color:"var(--ink-3)", fontSize:12, marginTop:2}}>{h.matters_because}</div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            )}
+            {D.regional.what_property_level_flood_misses && (
+              <p style={{margin:"10px 0", padding:"10px 12px", background:"var(--bg)", borderLeft:"3px solid var(--accent)", borderRadius:4, fontSize:13, color:"var(--ink-2)", lineHeight:1.55}}>
+                <strong style={{color:"var(--accent)"}}>vs property-level FEMA · </strong>{D.regional.what_property_level_flood_misses}
+              </p>
+            )}
+            {D.regional.resilience_context && (
+              <p style={{margin:"10px 0", padding:"10px 12px", background:"var(--bg)", borderLeft:"3px solid var(--teal)", borderRadius:4, fontSize:13, color:"var(--ink-2)", lineHeight:1.55}}>
+                <strong style={{color:"var(--teal)"}}>Community resilience · </strong>{D.regional.resilience_context}
+              </p>
+            )}
+            <div style={{fontSize:11, color:"var(--ink-4)", marginTop:10, fontFamily:"'JetBrains Mono', monospace"}}>
+              source · FEMA National Risk Index via the Resilience Analysis and Planning Tool (RAPT)
+            </div>
+          </Section>
+        )}
+
         <Section
-          num={(D.streetview?.available || D.satellite?.available) ? "§05" : "§04"}
+          num={_sectionNums.signals}
           icon={<Icon name="drop" color="var(--accent)" size={16}/>}
           iconBg="var(--accent-soft)"
           title="The raw signals we looked at"
@@ -1559,7 +1664,7 @@ const DossierScreen = ({ onBack, dossier }) => {
         </Section>
 
         <Section
-          num={(D.streetview?.available || D.satellite?.available) ? "§06" : "§05"}
+          num={_sectionNums.news}
           icon={<Icon name="news" color="var(--amber)" size={16}/>}
           iconBg="var(--amber-soft)"
           title="Recent local flood news">
@@ -1594,7 +1699,7 @@ const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
       <span>FlutIQ</span>
-      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.13 · beta</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.14 · beta</span>
     </div>
     <div className="chrome-meta">
       <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>

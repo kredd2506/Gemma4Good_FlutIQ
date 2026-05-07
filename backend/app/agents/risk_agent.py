@@ -110,6 +110,15 @@ Here is all the data collected by our investigation team:
 ## Satellite Visual Analysis (from the satellite agent)
 {json.dumps({k: v for k, v in (all_data.get('satellite') or {}).items() if k != 'image_data_url'}, indent=2, default=str)}
 
+## Regional Multi-Hazard Profile (FEMA NRI, county-level — from the regional_risk agent)
+This is the COUNTY-level National Risk Index profile — wider than the
+property-specific signals above, narrower than national. Use it to widen
+the risk story beyond flooding (wildfire, hurricane, tornado, earthquake,
+etc. as applicable to this geography). Don't double-count: NRI's Inland
+Flooding score is county-level; the FEMA flood zone above is the
+authoritative property-level designation.
+{json.dumps({k: v for k, v in (all_data.get('regional') or {}).items() if k != 'nri'}, indent=2, default=str)}
+
 ## Weather & Hydrology Findings
 {json.dumps(all_data.get('weather', {}), indent=2, default=str)}
 

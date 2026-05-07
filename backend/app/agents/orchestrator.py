@@ -21,6 +21,7 @@ from app.agents.archive_agent import run_archive_agent
 from app.agents.fema_agent import run_fema_agent
 from app.agents.local_agent import run_local_agent
 from app.agents.news_agent import run_news_agent
+from app.agents.regional_risk_agent import run_regional_risk_agent
 from app.agents.risk_agent import run_risk_agent
 from app.agents.satellite_agent import run_satellite_agent
 from app.agents.streetview_agent import run_streetview_agent
@@ -78,10 +79,19 @@ def _make_satellite(language: str) -> AgentFn:
     return _run
 
 
+def _make_regional(language: str) -> AgentFn:
+    async def _run(ctx: GeoCtx) -> dict:
+        return await run_regional_risk_agent(
+            ctx["lat"], ctx["lon"], ctx.get("display_name", ""),
+            language=language,
+        )
+    return _run
+
+
 # Order here is the order the frontend renders agent rows in.
 # The two vision agents (streetview eye-level + satellite bird's-eye)
-# are placed last in the data row so users see the slower vision
-# calls finishing after the cheap text-API calls.
+# are placed last so users see the slower vision calls finishing after
+# the cheap text-API calls.
 def _data_agents_for(language: str) -> dict[str, AgentFn]:
     return {
         "fema": _fema,
@@ -89,6 +99,7 @@ def _data_agents_for(language: str) -> dict[str, AgentFn]:
         "weather": _weather,
         "news": _news,
         "archive": _archive,
+        "regional": _make_regional(language),
         "satellite": _make_satellite(language),
         "streetview": _make_streetview(language),
     }
@@ -260,6 +271,7 @@ def _compile_dossier(geo: GeoCtx, results: dict) -> dict:
         "archive": results.get("archive", {}),
         "streetview": results.get("streetview", {}),
         "satellite": results.get("satellite", {}),
+        "regional": results.get("regional", {}),
         "risk": results.get("risk", {}),
         "advisor": results.get("advisor", {}),
     }
