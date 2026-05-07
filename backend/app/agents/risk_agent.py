@@ -148,6 +148,7 @@ Return a JSON object with:
   "risk_level": "low" | "medium" | "high",
   "aep_estimate": <estimated annual exceedance probability as decimal, e.g. 0.04>,
   "mortgage_30yr_probability": <cumulative probability over 30 years, e.g. 0.68>,
+  "plain_verdict": "<the BOTTOM LINE for someone about to live/buy/rent here, written as if you were the friend they texted who happens to be a flood expert. Second person, plain English, ~10th-grade reading level, ONE paragraph (3-5 sentences). Lead with the verdict in the first sentence, then the single most important reason, then the trend direction (improving / stable / worsening) and why. Quantify where possible (probabilities, counts, dollar figures). Do not hedge unnecessarily and do not generate alarm; sound like an analyst, not a parent.>",
   "fema_gap_explanation": "<2-3 sentences explaining if/why FEMA designation is misleading>",
   "visual_corroboration": {"<2-3 sentences on what the photo confirms, contradicts, or adds beyond the data; '' if no image was provided>" if has_image else "''"},
   "key_risk_factors": ["<ranked list of top risk factors>"],

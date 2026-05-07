@@ -11,7 +11,7 @@ might generate from outdated training data.
 
 🌊 **Live demo:** [kredd25-flutiq.hf.space](https://kredd25-flutiq.hf.space)
 &nbsp;·&nbsp;
-**Status:** v0.14.1 · beta
+**Status:** v0.15 · beta
 
 > **Mission:** reduce the complexity and scariness of insurance.
 > The technical pitch (FEMA-gap, multimodal Gemma 4, multi-agent
@@ -22,6 +22,37 @@ might generate from outdated training data.
 
 ## What's new since v0.7
 
+- 🏠🌐 **Dual-mode: FlutIQ Cloud + FlutIQ Edge** (v0.15) — same code,
+  same agents, same dossier, two LLM endpoints. **Cloud** runs Gemma 4
+  31B via OpenRouter (the live HF demo). **Edge** runs Gemma 4 e4b
+  locally via Ollama on a MacBook — address never leaves the device,
+  no API key, no internet for inference. Switched by a single env var
+  (`INFERENCE_BACKEND=ollama`); the frontend re-skins itself with
+  green accents and a "FlutIQ Edge" wordmark so a judge can tell
+  modes apart at a glance. Directly addresses the hackathon's "local
+  frontier intelligence" + "privacy is non-negotiable" framing.
+- 🎯 **Expert-briefing dossier reframe** (v0.15) — the dossier now
+  reads like what a flood-savvy friend would write up for someone
+  about to live, buy, or rent here. Three additions:
+  - **Bottom-line verdict**: the risk analyst writes a 3-5 sentence
+    `plain_verdict` in second-person, ~10th-grade reading level —
+    leads with the call, then the most important reason, then the
+    trend direction. Surfaces as the first card under the score.
+  - **Before-you-sign checklist**: the advisor produces 3-5 due-diligence
+    items the reader should verify *this week*, each tagged with a
+    citation chip back to the data layer that flagged it (FEMA, 311,
+    Permits, City sewer, Satellite, Street view, NRI, USGS/NOAA).
+  - **Bucketed mitigations**: the advisor's `mitigation_actions` are
+    now grouped into *get water away / let it soak in / block the
+    rest* — the prompt explicitly enumerates rainwater harvesting,
+    permeable pavers, backwater valves, and groundwater recharge as
+    valid actions. A 14-item list reads like a 3-step plan.
+- 🧾 **Synthesis receipt** (v0.15) — a discreet "Synthesized from
+  FEMA · 311 (n) · Permits (n / $M / 3y) · NRI · USGS · NOAA · 2 images"
+  strip near the top of the dossier. Quietly tells the time-compression
+  story: this is what would otherwise take a flood surveyor + permit
+  researcher + insurance broker several weeks and several hundred
+  dollars to assemble.
 - 🛰️ **Multimodal risk analyst** (v0.9–v0.11) — the synthesis agent
   no longer just reads other agents' text findings; it gets the
   Street View photo *and* the Mapbox satellite image directly,

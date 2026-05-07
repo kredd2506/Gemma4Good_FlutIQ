@@ -1,4 +1,4 @@
-# FlutIQ — current state (2026-05-06, v0.14.1)
+# FlutIQ — current state (2026-05-07, v0.15)
 
 A working snapshot of what's built, what wobbles, and what's left.
 This is a build journal, not a polished README — the README at the
@@ -178,7 +178,7 @@ The React app lives entirely in `backend/static/index.html`
 
 ---
 
-## Versions shipped (v0.7 → v0.14.1)
+## Versions shipped (v0.7 → v0.15)
 
 | Version | Highlight |
 |---|---|
@@ -191,6 +191,57 @@ The React app lives entirely in `backend/static/index.html`
 | **v0.13** | Tier-1 multi-city: Chicago + NYC + SF + LA + Austin |
 | **v0.14** | Regional risk agent — FEMA NRI multi-hazard at county level (all US counties) |
 | **v0.14.1** | System-prompt tuning for the 4-layer signal hierarchy (Property / Neighborhood / Visual / Regional) |
+| **v0.15** | Dual-mode (FlutIQ Cloud via OpenRouter + FlutIQ Edge via Ollama / Gemma 4 e4b on-device) + expert-briefing dossier reframe (`plain_verdict`, `before_you_move_in[]` with citations, mitigation_actions bucketed into drainage / infiltration / barrier, synthesis-receipt strip) |
+
+---
+
+## v0.15 — what shipped this round
+
+**Dual-mode (Cloud + Edge):**
+- New `INFERENCE_BACKEND` env var in `config.py` switches the LLM
+  endpoint without touching agent code. `"openrouter"` (default,
+  used by the HF Space) → cloud Gemma 4 31B. `"ollama"` → local
+  `gemma4:e4b` at `localhost:11434/v1`.
+- `client.py` now reads `LLM_BASE_URL` / `LLM_API_KEY` /
+  `MODEL_PRIMARY` from config; OpenRouter-only telemetry headers
+  (`HTTP-Referer`, `X-Title`) only sent in cloud mode; httpx timeout
+  bumped to 300s in Ollama mode (laptop is slower than OpenRouter).
+- `main.py` now serves index.html via `HTMLResponse` with
+  `__INFERENCE_BACKEND__` placeholder substitution, so the page
+  knows its variant before any JS runs.
+- Frontend re-skins itself based on `data-variant`: blue accents +
+  "FlutIQ Cloud" wordmark for cloud, green accents + "FlutIQ Edge"
+  for ollama. Same React app, ~25 lines of CSS overrides.
+- Verified end-to-end on `gemma4:e4b` against an M4 Pro 24 GB:
+  `/api/assess` for a Chicago address completes in ~190 s, all 9
+  agents finish, both vision agents (satellite + streetview) produce
+  grounded findings.
+- Hackathon-brief surface: addresses "local frontier intelligence",
+  "privacy is non-negotiable", "E2B and E4B for edge".
+
+**Expert-briefing dossier reframe:**
+- `RISK_AGENT_SYSTEM_PROMPT` reframed: "you are producing an expert
+  briefing for someone about to live/buy/rent here … they would
+  otherwise spend several weeks and hundreds of dollars piecing
+  this together themselves. Your value is synthesis and time, not
+  novel prediction." Voice on the new `plain_verdict` field is
+  second-person, ~10th-grade reading, lead with the bottom line
+  then the single most important reason then the trend direction.
+- `risk_agent` schema gains `plain_verdict` (validated live: produces
+  3-5 sentence verdicts that pass smell test on Chicago test address).
+- `advisor_agent` schema gains `before_you_move_in[]` (each item:
+  `check`, `why`, `how`, `cite` — the citation tag must come from a
+  closed enum: FEMA / 311 / Permits / City sewer / Satellite /
+  Street view / NRI / USGS+NOAA).
+- `advisor_agent` `mitigation_actions[]` gains a `bucket` field
+  (`drainage` | `infiltration` | `barrier`); the prompt enumerates
+  rainwater harvesting, permeable pavers, groundwater recharge,
+  backwater valve, sump-pump-with-battery as part of the action
+  vocabulary so the model reliably covers all three buckets.
+- Frontend dossier rewrite: Bottom-line verdict card + "Synthesized
+  from …" receipt strip + Before-you-sign Section above the existing
+  actions/insurance sections; dynamic section numbering reshuffles
+  cleanly when the new before-you-sign Section is present.
 
 ---
 

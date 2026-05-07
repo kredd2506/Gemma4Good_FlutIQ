@@ -88,9 +88,42 @@ City: {city or "(unknown)"} · State: {state or "(unknown)"}
 
 ---
 
-TASK: Pick which catalog products genuinely fit THIS property based on its
-risk profile, FEMA zone, and 311 signal. For each one you pick, write a
-short rationale that explains why it fits THIS address (not a generic pitch).
+TASK: This person is about to live, buy, or rent here. Pick which catalog
+products genuinely fit THIS property based on its risk profile, FEMA zone,
+and 311 signal. For each one you pick, write a short rationale that explains
+why it fits THIS address (not a generic pitch). Also produce a pre-move
+due-diligence checklist and a bucketed list of physical mitigation actions.
+
+DUE-DILIGENCE CHECKLIST GUIDANCE:
+- 3-5 concrete things the reader should verify *before* signing a lease,
+  closing a sale, or moving in. Each item must be actionable today.
+- Each item gets a citation tag tying it back to the data layer that
+  motivated it. Use ONLY these citation labels:
+    "FEMA"           — federal flood-zone designation
+    "311"            — historical flood-report records
+    "Permits"        — recent building permits / densification trend
+    "City sewer"     — combined-vs-separated system literacy
+    "Satellite"      — bird's-eye visual analysis
+    "Street view"    — eye-level visual analysis
+    "NRI"            — county-level multi-hazard profile
+    "USGS/NOAA"      — gauge data and weather forecasts
+
+MITIGATION-ACTIONS GUIDANCE:
+- Bucket every action into exactly ONE of three buckets so we can group
+  them visually:
+    "drainage"     — get water away from the building
+                     (downspout disconnect, sump pump w/ battery backup,
+                      french drain, gutter extensions, regrade soil)
+    "infiltration" — let water soak in / reduce impervious load
+                     (rain garden, rainwater harvesting barrels/cistern,
+                      permeable pavers, native-plant landscaping,
+                      lawn aeration, groundwater recharge pits)
+    "barrier"      — block water from getting in
+                     (backwater valve, foundation crack sealing,
+                      basement waterproofing, window-well covers,
+                      flood vents)
+- Cover at least one action from each bucket if any are remotely relevant.
+- Concrete first_step every time; no "consult a professional" placeholder.
 
 Return a JSON object with:
 {{
@@ -107,8 +140,17 @@ Return a JSON object with:
       "rationale": "<2 sentences specific to THIS property — why this fits, in plain English>"
     }}
   ],
+  "before_you_move_in": [
+    {{
+      "check": "<imperative, e.g. 'Ask the seller for the last 2 years of plumber invoices for sewer cleanouts'>",
+      "why": "<1 sentence in plain English on what this would reveal>",
+      "how": "<1 sentence on the practical mechanic — who to ask, when to look, what tool to bring>",
+      "cite": "<one of: FEMA | 311 | Permits | City sewer | Satellite | Street view | NRI | USGS/NOAA>"
+    }}
+  ],
   "mitigation_actions": [
     {{
+      "bucket": "drainage" | "infiltration" | "barrier",
       "action": "<short title, e.g. Disconnect downspouts>",
       "cost": "<e.g. Free, $150-300, $1K-2.5K>",
       "effort": "diy" | "contractor" | "professional",
@@ -139,6 +181,7 @@ Do not invent prices or company names. Return ONLY the JSON object."""
         return {
             "tldr": "",
             "insurance_recommendations": [],
+            "before_you_move_in": [],
             "mitigation_actions": [],
             "key_resources": resources,
             "summary": "Advisor returned non-JSON output",

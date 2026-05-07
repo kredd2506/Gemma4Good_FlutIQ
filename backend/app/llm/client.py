@@ -24,15 +24,23 @@ import httpx
 from app.config import (
     APP_URL,
     APP_NAME,
+    INFERENCE_BACKEND,
+    LLM_API_KEY,
+    LLM_BASE_URL,
     MODEL_FALLBACK,
     MODEL_PRIMARY,
-    OPENROUTER_API_KEY,
-    OPENROUTER_BASE,
 )
 
 
 class RateLimitedError(Exception):
     """All retries exhausted while upstream was rate-limiting."""
+
+
+# Local inference is slower than cloud — the call has to wait for the
+# laptop GPU/CPU instead of OpenRouter's server. Bump the per-request
+# timeout so a slow first-token doesn't trip httpx before the model
+# finishes generating.
+_HTTP_TIMEOUT = 300.0 if INFERENCE_BACKEND == "ollama" else 120.0
 
 
 async def call_gemma4(
@@ -45,22 +53,26 @@ async def call_gemma4(
     retries: int = 3,
 ) -> dict:
     """
-    Call Gemma 4 via OpenRouter. Returns the raw response JSON.
+    Call Gemma 4 via the configured INFERENCE_BACKEND. Returns raw response JSON.
 
     Retry policy:
       - On 429 with primary model: switch to fallback model, then retry
-        with exponential backoff (2s, 4s, 8s).
+        with exponential backoff (2s, 4s, 8s). (Cloud only; Ollama queues
+        instead of rate-limiting.)
       - On timeout: short retry.
     """
-    if not OPENROUTER_API_KEY:
+    if INFERENCE_BACKEND != "ollama" and not LLM_API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {LLM_API_KEY or 'ollama'}",
         "Content-Type": "application/json",
-        "HTTP-Referer": APP_URL,
-        "X-Title": APP_NAME,
     }
+    # OpenRouter-only telemetry headers; Ollama would just ignore them
+    # but cleaner to omit when irrelevant.
+    if INFERENCE_BACKEND == "openrouter":
+        headers["HTTP-Referer"] = APP_URL
+        headers["X-Title"] = APP_NAME
 
     payload: dict = {
         "model": model,
@@ -77,11 +89,11 @@ async def call_gemma4(
     current_model = model
     backoff = 2.0
 
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
         for attempt in range(retries + 1):
             try:
                 resp = await client.post(
-                    f"{OPENROUTER_BASE}/chat/completions",
+                    f"{LLM_BASE_URL}/chat/completions",
                     headers=headers,
                     json={**payload, "model": current_model},
                 )

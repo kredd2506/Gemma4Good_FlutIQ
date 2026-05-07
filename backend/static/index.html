@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-variant="__INFERENCE_BACKEND__">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=1280" />
@@ -40,6 +40,29 @@
     --map-road: #F8F5EE;
     --map-stroke: rgba(22,22,22,0.14);
   }
+
+  /* FlutIQ Edge variant — Ollama / on-device inference. Green accent
+     palette signals "running locally" at a glance. The four hardcoded
+     gradient stops below mirror the blue gradients elsewhere in the
+     stylesheet, just shifted to a teal-green family. */
+  html[data-variant="ollama"] {
+    --accent: #0F8A6A;
+    --accent-2: #4FB793;
+    --accent-soft: #DDF1E9;
+  }
+  html[data-variant="ollama"] .wordmark .glyph {
+    background: radial-gradient(circle at 30% 25%, #A8E0CC 0%, var(--accent) 55%, #074C3A 100%);
+  }
+  html[data-variant="ollama"] .droplet {
+    background: radial-gradient(circle at 32% 28%, #BFE8D5 0%, var(--accent) 55%, #074C3A 100%);
+  }
+  html[data-variant="ollama"] .search-submit {
+    background: linear-gradient(135deg, var(--accent) 0%, #074C3A 100%);
+  }
+  html[data-variant="ollama"] .center-pin {
+    background: radial-gradient(circle at 30% 25%, #BFE8D5 0%, var(--accent) 55%, #074C3A 100%);
+  }
+
   body::before {
     content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
     background:
@@ -376,23 +399,26 @@
 <script type="text/babel">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-// Backend URL.
-//   Default: same-origin ("") — works when FastAPI serves index.html
-//     itself (the bundled HF Space deploy).
-//   Override: window.FLUTIQ_API or ?api=... query string. Used during
-//     local dev when serving the HTML on a different port from the
-//     backend (e.g. python -m http.server 5173 → backend on :8000).
+// Inference variant — populated by FastAPI's index handler before send.
+// Values: "openrouter" (cloud) | "ollama" (edge / on-device) |
+//         "__INFERENCE_BACKEND__" (raw file served without substitution).
+// Anything other than "ollama" falls through to Cloud branding, so the
+// blue Cloud look-and-feel is the safe default.
+const VARIANT = document.documentElement.dataset.variant || "openrouter";
+const IS_EDGE = VARIANT === "ollama";
+const BRAND_NAME = IS_EDGE ? "FlutIQ Edge" : "FlutIQ Cloud";
+const BRAND_PILL = IS_EDGE ? "gemma-4 · Edge (Ollama, on-device)" : "gemma-4 · Cloud (OpenRouter)";
+document.title = `${BRAND_NAME} — flood risk advisor`;
+
+// Backend URL. Default to same-origin so that whichever uvicorn served
+// the HTML (port 8000 cloud, port 8001 edge, HF Space, etc.) is also the
+// API target. Override with ?api=... or window.FLUTIQ_API only when the
+// page and backend are on different origins (e.g. python -m http.server).
 const API_URL = (() => {
   const fromQuery = new URLSearchParams(window.location.search).get("api");
   if (fromQuery) return fromQuery;
   if (window.FLUTIQ_API) return window.FLUTIQ_API;
-  // Heuristic: if we're on an obviously-not-the-backend dev port, fall
-  // back to the local uvicorn default. Otherwise assume same origin.
-  const onDevHttpServer = (
-    (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") &&
-    window.location.port && window.location.port !== "8000"
-  );
-  return onDevHttpServer ? "http://127.0.0.1:8000" : "";
+  return "";
 })();
 
 // ── SSE hook ───────────────────────────────────────────────────────────────
@@ -788,7 +814,7 @@ const SearchScreen = ({ onSubmit }) => {
       </div>
 
       <div className="search-card">
-        <span className="eyebrow">FlutIQ</span>
+        <span className="eyebrow">{BRAND_NAME}</span>
         <h1 className="lede">Your <em>real</em> flood risk.</h1>
 
         <form className="search-input-row" onSubmit={(e) => { e.preventDefault(); submit(); }}>
@@ -1076,17 +1102,32 @@ const mapDossier = (raw) => {
   const advisor_tldr = advisor.tldr || "";
 
   const actions = (advisor.mitigation_actions || []).map(a => ({
+    bucket: (a.bucket || "other").toLowerCase(),
     title: a.action || "Action",
     cost: a.cost || "",
     desc: a.first_step || "",
+    effort: a.effort || "",
+    impact: a.impact || "",
     contact: null,
   }));
 
-  // Surface advisor.key_resources as additional bottom rows.
+  const before_you_move_in = (advisor.before_you_move_in || []).map(b => ({
+    check: b.check || "",
+    why: b.why || "",
+    how: b.how || "",
+    cite: b.cite || "",
+  })).filter(b => b.check);
+
+  // Surface advisor.key_resources as additional bottom rows. Tagged
+  // with bucket "resources" so the grouped renderer keeps them in
+  // their own section after the three physical-mitigation buckets.
   const resourceRows = (advisor.key_resources || []).map(r => ({
+    bucket: "resources",
     title: r.name || "Resource",
     cost: "info",
     desc: r.what || "",
+    effort: "",
+    impact: "",
     contact: r.contact_or_url || null,
   }));
 
@@ -1120,6 +1161,8 @@ const mapDossier = (raw) => {
     used_streetview_image: !!risk.used_streetview_image,
     images_used: risk.images_used || [],
     advisor_tldr,
+    plain_verdict: risk.plain_verdict || "",
+    before_you_move_in,
     streetview: raw.streetview || {},
     satellite: raw.satellite || {},
     local: raw.local || {},
@@ -1132,18 +1175,23 @@ const DossierScreen = ({ onBack, dossier }) => {
   const [showReasoning, setShowReasoning] = useState(false);
 
   // Section numbers depend on which conditional sections render. We
-  // precompute them so the rendering JSX stays readable.
+  // precompute them so the rendering JSX stays readable. The order
+  // here mirrors the visual order in the dossier below.
   const _sectionNums = useMemo(() => {
+    const hasBefore   = (D.before_you_move_in || []).length > 0;
     const hasImages   = D.streetview?.available || D.satellite?.available;
     const hasRegional = D.regional?.available;
-    let n = 2;  // §01 actions, §02 insurance fixed
+    let n = 0;
     const fmt = () => "§" + String(++n).padStart(2, "0");
     return {
-      images:   hasImages   ? fmt() : null,
-      gap:      fmt(),
-      regional: hasRegional ? fmt() : null,
-      signals:  fmt(),
-      news:     fmt(),
+      before:    hasBefore   ? fmt() : null,
+      actions:   fmt(),
+      insurance: fmt(),
+      images:    hasImages   ? fmt() : null,
+      gap:       fmt(),
+      regional:  hasRegional ? fmt() : null,
+      signals:   fmt(),
+      news:      fmt(),
     };
   }, [D]);
   const [showBoxes, setShowBoxes] = useState(true);
@@ -1170,29 +1218,109 @@ const DossierScreen = ({ onBack, dossier }) => {
           </div>
         </div>
 
+        {D.plain_verdict && (
+          <div style={{margin: "20px 0 14px", padding: "16px 18px 18px", background: "var(--surface)", border: "1px solid var(--line)", borderLeft: "4px solid var(--accent)", borderRadius: 12, boxShadow: "0 6px 16px rgba(22,22,22,0.04)"}}>
+            <div style={{display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 8}}>
+              <span>◆ Bottom line</span>
+              <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· what a flood-savvy friend would tell you</span>
+            </div>
+            <p style={{margin: 0, fontSize: 15, lineHeight: 1.6, color: "var(--ink)"}}>{D.plain_verdict}</p>
+          </div>
+        )}
+
+        {(() => {
+          // Synthesis receipt — shows what data sources fed the briefing.
+          // Quietly tells the time-compression story without bragging.
+          const items = [];
+          if (D.fema_gap?.aep_pct != null) items.push(`FEMA · ${D.fema_gap.aep_pct.toFixed?.(2) ?? D.fema_gap.aep_pct}% AEP`);
+          const r311 = (D.local?.basement_flooding_reports ?? null);
+          const s311 = (D.local?.street_flooding_reports ?? null);
+          if (r311 != null || s311 != null) items.push(`311 · ${(r311 ?? 0)} basement / ${(s311 ?? 0)} street`);
+          const con = D.local?.construction;
+          if (con && (con.permits_count || con.total_value_usd)) {
+            const dollars = con.total_value_usd ? `$${(con.total_value_usd/1e6).toFixed(0)}M` : "";
+            items.push(`Permits · ${con.permits_count || 0} / ${dollars} / 3y`);
+          }
+          if (D.regional?.available) items.push("NRI multi-hazard");
+          items.push("USGS · NOAA");
+          if (D.images_used?.length) items.push(`${D.images_used.length} image${D.images_used.length === 1 ? "" : "s"} (${D.images_used.join(" + ")})`);
+          return (
+            <div style={{margin: "0 0 22px", padding: "10px 14px", background: "var(--bg)", border: "1px dashed var(--line)", borderRadius: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--ink-3)", lineHeight: 1.7}}>
+              <span style={{color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 8}}>Synthesized from</span>
+              {items.join("  ·  ")}
+            </div>
+          );
+        })()}
+
+        {D.before_you_move_in.length > 0 && (
+          <Section
+            num={_sectionNums.before}
+            icon={<Icon name="search" color="var(--purple)" size={16}/>}
+            iconBg="var(--purple-soft)"
+            title="Before you sign — what to verify this week"
+            badge={<span className="risk-tag purple">due diligence</span>}>
+            <p style={{color:"var(--ink-2)"}}>If you're considering a lease or a purchase, these are the things a flood-savvy buyer would check first. Each item points to the data layer that flagged it.</p>
+            {D.before_you_move_in.map((b,i) => (
+              <div key={i} className="action-row">
+                <div className="action-num">{i+1}</div>
+                <div className="action-body">
+                  <div className="action-title">{b.check}{b.cite && <span className="cost" style={{color:"var(--purple)", background:"var(--purple-soft)", padding:"2px 8px", borderRadius:6, marginLeft:8, fontSize:11}}>from {b.cite}</span>}</div>
+                  {b.why && <div className="action-desc"><strong>Why · </strong>{b.why}</div>}
+                  {b.how && <div className="action-desc" style={{marginTop:4}}><strong>How · </strong>{b.how}</div>}
+                </div>
+              </div>
+            ))}
+          </Section>
+        )}
+
         <Section
-          num="§01"
+          num={_sectionNums.actions}
           icon={<Icon name="plus" color="var(--teal)" size={16}/>}
           iconBg="var(--teal-soft)"
-          title="Start here — what to do this month"
+          title="What to do once you live there"
           badge={<span className="risk-tag teal">personalized</span>}>
-          <p style={{color:"var(--ink-2)"}}>You don't need to read the rest of this dossier to take the first step. These actions are sequenced cheapest-and-easiest first; do as many as feel right for your situation.</p>
+          <p style={{color:"var(--ink-2)"}}>Three ways to harden a property against urban flooding: get water <strong>away</strong> from the building, let it <strong>soak in</strong>, and <strong>block</strong> the rest from getting inside. Items below are sequenced cheapest-and-easiest first within each group.</p>
           {D.actions.length === 0 ? (
             <p style={{color:"var(--ink-3)"}}>The advisor agent did not return an action plan for this address.</p>
-          ) : D.actions.map((a,i) => (
-            <div key={i} className="action-row">
-              <div className="action-num">{i+1}</div>
-              <div className="action-body">
-                <div className="action-title">{a.title}<span className="cost">· {a.cost}</span></div>
-                <div className="action-desc">{a.desc}</div>
-                {a.contact && <div className="action-contact">{a.contact}</div>}
-              </div>
-            </div>
-          ))}
+          ) : (() => {
+            const BUCKETS = [
+              {key: "drainage",     label: "Get water away from the building",  hint: "downspouts, sump pumps, regrading"},
+              {key: "infiltration", label: "Let water soak in",                 hint: "rain gardens, rainwater harvesting, permeable surfaces"},
+              {key: "barrier",      label: "Block water from getting in",       hint: "backwater valve, waterproofing, flood vents"},
+              {key: "resources",    label: "Local resources & rebates",         hint: "city programs, contacts, grants"},
+              {key: "other",        label: "Other actions",                     hint: ""},
+            ];
+            let counter = 0;
+            return BUCKETS.map(bk => {
+              const items = D.actions.filter(a => (a.bucket || "other").toLowerCase() === bk.key);
+              if (items.length === 0) return null;
+              return (
+                <div key={bk.key} style={{marginTop: 16}}>
+                  <div style={{display:"flex", alignItems:"baseline", gap:10, marginBottom:6, paddingBottom:6, borderBottom:"1px solid var(--line)"}}>
+                    <span style={{fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"var(--teal)", textTransform:"uppercase", letterSpacing:"0.08em"}}>{bk.label}</span>
+                    {bk.hint && <span style={{color:"var(--ink-4)", fontSize:11}}>· {bk.hint}</span>}
+                  </div>
+                  {items.map((a,i) => {
+                    counter += 1;
+                    return (
+                      <div key={i} className="action-row">
+                        <div className="action-num">{counter}</div>
+                        <div className="action-body">
+                          <div className="action-title">{a.title}<span className="cost">· {a.cost}</span>{a.effort && <span className="cost" style={{color:"var(--ink-4)", marginLeft:6}}>· {a.effort}</span>}{a.impact && <span className="cost" style={{color:a.impact === "high" ? "var(--teal)" : "var(--ink-4)", marginLeft:6}}>· {a.impact} impact</span>}</div>
+                          <div className="action-desc">{a.desc}</div>
+                          {a.contact && <div className="action-contact">{a.contact}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            });
+          })()}
         </Section>
 
         <Section
-          num="§02"
+          num={_sectionNums.insurance}
           icon={<Icon name="dollar" color="var(--purple)" size={16}/>}
           iconBg="var(--purple-soft)"
           title="Insurance options, in plain English"
@@ -1698,11 +1826,11 @@ const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange
   <div className="app-chrome">
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
-      <span>FlutIQ</span>
-      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.14 · beta</span>
+      <span>{BRAND_NAME}</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.15 · beta</span>
     </div>
     <div className="chrome-meta">
-      <span className="pill static"><span className="dot"/>gemma-4 · OpenRouter</span>
+      <span className="pill static"><span className="dot"/>{BRAND_PILL}</span>
       <select
         value={language}
         onChange={(e) => onLanguageChange(e.target.value)}
