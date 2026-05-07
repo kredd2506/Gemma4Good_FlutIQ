@@ -1237,9 +1237,9 @@ const DossierScreen = ({ onBack, dossier }) => {
           const s311 = (D.local?.street_flooding_reports ?? null);
           if (r311 != null || s311 != null) items.push(`311 · ${(r311 ?? 0)} basement / ${(s311 ?? 0)} street`);
           const con = D.local?.construction;
-          if (con && (con.permits_count || con.total_value_usd)) {
-            const dollars = con.total_value_usd ? `$${(con.total_value_usd/1e6).toFixed(0)}M` : "";
-            items.push(`Permits · ${con.permits_count || 0} / ${dollars} / 3y`);
+          if (con && (con.permits_count || con.total_reported_cost)) {
+            const dollars = con.total_reported_cost ? ` / $${(con.total_reported_cost/1e6).toFixed(0)}M` : "";
+            items.push(`Permits · ${con.permits_count || 0}${dollars} / 3y`);
           }
           if (D.regional?.available) items.push("NRI multi-hazard");
           items.push("USGS · NOAA");
