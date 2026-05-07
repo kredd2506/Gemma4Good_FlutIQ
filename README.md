@@ -11,35 +11,54 @@ might generate from outdated training data.
 
 🌊 **Live demo:** [kredd25-flutiq.hf.space](https://kredd25-flutiq.hf.space)
 &nbsp;·&nbsp;
-**Status:** v0.7 · beta
+**Status:** v0.14.1 · beta
 
 > **Mission:** reduce the complexity and scariness of insurance.
-> The technical pitch (FEMA-gap, Gemma 4 reasoning, multi-agent
+> The technical pitch (FEMA-gap, multimodal Gemma 4, multi-agent
 > orchestration) is the vehicle; the goal is making a homeowner feel
 > less overwhelmed about their flood-insurance decisions.
 
 ---
 
-## What's new in v0.7
+## What's new since v0.7
 
-- 🌐 **Multi-language dossier** (Spanish, Mandarin, Vietnamese, Haitian
-  Creole, Arabic, Tagalog) — pick from a dropdown in the chrome bar.
-  User-facing copy translates; product names, URLs, and dollar amounts
-  stay English so the homeowner can still call the right number.
-- 📷 **Street View vision agent** — fetches a Google Street View image
-  of the property and asks Gemma 4 (multimodal) to identify visible
-  flood-risk indicators: basement-level windows, ground-floor HVAC,
-  drainage infrastructure, evidence of past water damage, elevation
-  vs street. Honest about what it can't see — won't fabricate features.
-- 🚀 **Single-Space deploy** — backend + bundled frontend on one HF
-  Space, one URL, no CORS dance.
-- 🏘️ **US Census Geocoder fallback** — addresses that Nominatim doesn't
-  know now resolve via TIGER/Line.
-- ✅ **Verified insurance catalog** — the advisor agent can no longer
-  invent products. All recommendations come from a hand-curated
-  catalog of real, currently-available policies (NFIP post-Risk
-  Rating 2.0, sewer/water-backup endorsements, parametric, private
-  flood) with verified prices and contact info.
+- 🛰️ **Multimodal risk analyst** (v0.9–v0.11) — the synthesis agent
+  no longer just reads other agents' text findings; it gets the
+  Street View photo *and* the Mapbox satellite image directly,
+  alongside structured data, in one Gemma 4 call. The chain-of-thought
+  trace explicitly cites which layer each claim comes from
+  (Property / Neighborhood / Visual / Regional).
+- 🎯 **Bounding-box detection on Street View** (v0.8) and on satellite
+  (v0.11) — Gemma 4's native object detection draws boxes around
+  each indicator it identifies (basement windows, parking lots,
+  drainage features) on the actual image.
+- 🏗️ **Building permits as a leading indicator** (v0.12) — alongside
+  the historical 311 sewer-backup signal, the local agent now pulls
+  recent construction permits within 1km/3y. The compound narrative
+  ("clean 311 today + heavy densification = rising risk because the
+  combined sewers serving these blocks aren't being upgraded") is
+  something no other tool surfaces.
+- 🌆 **Multi-city** (v0.13) — five Tier-1 cities supported with
+  city-specific 311 + permits where available: Chicago (full),
+  NYC (311 only — DOB datasets fragmented), SF (full), LA
+  (permits-only — separated sewer system, no flood-coded 311),
+  Austin (311 + permit-count). Each city's combined-vs-separated
+  sewer literacy is injected into the local agent's prompt.
+- 🌪️ **Multi-hazard regional context** (v0.14) — a new regional risk
+  agent queries FEMA's National Risk Index via the RAPT ArcGIS REST
+  endpoint. Every US county gets calibrated scores across 18 hazards
+  (wildfire, hurricane, tornado, earthquake, etc.), plus Social
+  Vulnerability and Community Resilience indices. FlutIQ is no
+  longer flood-only.
+- 🌐 **Multi-language dossier** (v0.7, still live) — Spanish, Mandarin,
+  Vietnamese, Haitian Creole, Arabic, Tagalog. Product names, URLs,
+  phone numbers stay English so the homeowner can still call the
+  right number.
+- ✅ **Verified insurance catalog** — the advisor agent can't invent
+  products. All recommendations come from a hand-curated catalog of
+  real, currently-available policies (NFIP post-Risk Rating 2.0,
+  sewer/water-backup endorsements, parametric, private flood) with
+  verified prices and contact info.
 
 ---
 
@@ -68,39 +87,50 @@ flowchart TD
     SSE[FastAPI · /api/assess<br/>Server-Sent Events stream] --> Geo[Geocoder<br/>Nominatim → US Census fallback]
     Geo --> Orch{Orchestrator}
     Orch -->|parallel| FEMA[FEMA Agent<br/>NFHL flood zone]
-    Orch -->|parallel| Local[Local 311 Agent<br/>Chicago WIB/SFL]
+    Orch -->|parallel| Local[Local Agent<br/>311 + Building Permits<br/>5 cities]
     Orch -->|parallel| Weather[Weather Agent<br/>USGS + NOAA + Open-Meteo]
     Orch -->|parallel| News[News Agent<br/>GDELT 6mo]
     Orch -->|parallel| Archive[Archive Agent<br/>GDELT 24mo]
-    Orch -->|parallel| StreetView[Street View Agent<br/>Google SV + Gemma 4 vision]
+    Orch -->|parallel| Regional[Regional Risk Agent<br/>FEMA NRI · 18 hazards · county]
+    Orch -->|parallel| Satellite[Satellite Agent<br/>Mapbox + Gemma 4 vision<br/>+ bbox detection]
+    Orch -->|parallel| StreetView[Street View Agent<br/>Google SV + Gemma 4 vision<br/>+ bbox detection]
     FEMA --> Risk
     Local --> Risk
     Weather --> Risk
     News --> Risk
     Archive --> Risk
-    StreetView --> Risk
-    Risk[Risk Analyst<br/>Gemma 4 reasoning mode] --> Advisor
-    Advisor[Advisor Agent<br/>verified product catalog<br/>+ language directive] --> Dossier[Personalized Dossier<br/>in chosen language]
+    Regional --> Risk
+    Satellite -- text findings + raw image --> Risk
+    StreetView -- text findings + raw image --> Risk
+    Risk[Risk Analyst<br/>Gemma 4 reasoning + multimodal<br/>2 images + 7 data sources<br/>in one inference call] --> Advisor
+    Advisor[Advisor Agent<br/>verified product catalog<br/>+ language directive<br/>+ multi-hazard awareness] --> Dossier[Personalized Dossier<br/>in chosen language]
     Dossier --> User
 ```
 
-Eight specialist agents run on **Gemma 4** via OpenRouter:
+Nine specialist agents run on **Gemma 4** via OpenRouter:
 
-- **6 data agents** fan out concurrently against free public APIs.
-  Five do text-based ETL with LLM interpretation; one (Street View)
-  feeds an actual photo of the property to **Gemma 4's vision
-  capability** to identify flood-risk indicators visible from the
-  street.
+- **7 data agents** fan out concurrently against free public APIs.
+  Five do text-based ETL with LLM interpretation; **two
+  multimodal agents** (Street View at eye-level, Satellite at
+  bird's-eye) run dedicated **Gemma 4 vision** calls with
+  bounding-box detection and produce structured findings BEFORE
+  the synthesis. A new **regional risk agent** layers in FEMA's
+  multi-hazard NRI for the wider county.
 - **The risk analyst** synthesizes everything with Gemma 4's
-  **reasoning mode** turned on. The full chain-of-thought trace is
-  preserved on the dossier — including the actual AEP math
-  (`P = 1 − (1 − AEP)^n`).
+  **reasoning mode** turned on AND **both raw images** as
+  additional content parts in the same inference call. The
+  chain-of-thought trace explicitly cites which signal layer
+  each claim comes from: Property-level (FEMA, weather, USGS),
+  Neighborhood-level (311 + permits), Visual (the two images
+  the model is looking at), or Regional (NRI multi-hazard).
 - **The advisor** picks from a hand-curated catalog of *real,
-  verified* insurance products and writes the plain-English rationale
-  for why each fits THIS property. It cannot invent products,
-  prices, or contact info. Output is generated directly in the
-  homeowner's chosen language while keeping legal product names
-  in English.
+  verified* insurance products and writes the plain-English
+  rationale for why each fits THIS property. It cannot invent
+  products, prices, or contact info. Output generated directly
+  in the homeowner's chosen language while keeping legal product
+  names in English. Aware of the wider hazard mix from NRI but
+  catalog-disciplined — won't drift into recommending non-flood
+  products.
 
 Every event in the pipeline streams to the browser via SSE so the
 user watches agents light up live — no spinner, no black box.
@@ -137,8 +167,8 @@ products than 20 plausible-looking guesses.
 ## What you see (the dossier)
 
 Sections, ordered for the mission (action first, math last). Section
-numbers shift when Street View has coverage at the address (most US
-addresses do):
+numbers are computed at render time based on which conditional sections
+have data:
 
 1. **Start here — what to do this month.** Concrete, sequenced
    cheapest-first. (open by default)
@@ -146,17 +176,28 @@ addresses do):
    product cards with "what it covers," "what it *doesn't* cover,"
    and "how to actually get it." Sorted: start here → also
    consider → only if. (open by default)
-3. **What we saw at the property.** *(when Street View has coverage)*
-   The actual photo Gemma 4 vision examined, side-by-side with
-   the indicators it found (basement-level windows, ground-floor
-   HVAC, drainage, elevation vs street, etc.) Honest about
-   confidence — won't fabricate features it can't see.
-4. **Why FEMA's flood map isn't the whole story.** AEP math,
-   30-year cumulative probability, Gemma 4 reasoning trace. (closed
-   by default — opt-in for the curious)
-5. **The raw signals we looked at.** Stream gauges, alerts,
-   historical events, FEMA panel. (closed by default)
-6. **Recent local flood news.**
+3. **What we saw at the property.** *(when Street View or satellite
+   imagery has coverage)* Tabbed view of the actual images Gemma 4
+   vision examined — Street level + Satellite. Each tab shows the
+   image with **colored bounding boxes drawn around each indicator**
+   the model identified, side-by-side with a numbered list of those
+   indicators. Honest about confidence — won't fabricate features it
+   can't see.
+4. **Why FEMA's flood map isn't the whole story.** AEP math, 30-year
+   cumulative probability, the multimodal-reasoning callout (image +
+   data sources + chain-of-thought · one inference call), the
+   development-pressure callout when permits are available, and the
+   full Gemma 4 reasoning trace toggle. (closed by default — opt-in
+   for the curious)
+5. **Wider neighborhood — beyond just flooding.** *(NEW in v0.14)*
+   FEMA National Risk Index multi-hazard profile for the property's
+   county: composite score + rating, top 5 hazards (wildfire,
+   hurricane, tornado, etc.), Social Vulnerability + Community
+   Resilience indices, and Gemma's interpretation of what genuinely
+   matters here. The signal that broadens FlutIQ from flood-only.
+6. **The raw signals we looked at.** Stream gauges, alerts, historical
+   events, FEMA panel. (closed by default)
+7. **Recent local flood news.**
 
 Plus a Leaflet map of the actual address with a 500m search-radius
 ring matching the agents' query parameters, and a language picker
@@ -176,7 +217,8 @@ python3.13 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cat > .env <<'EOF'
 OPENROUTER_API_KEY=sk-or-v1-...   # required, see "BYOK" note below
-GOOGLE_MAPS_API_KEY=AIzaSy...     # optional, enables §03 Street View section
+GOOGLE_MAPS_API_KEY=AIzaSy...     # optional, enables Street View tab in §03
+MAPBOX_ACCESS_TOKEN=pk.eyJ1...    # optional, enables Satellite tab in §03
 EOF
 set -a && source .env && set +a
 .venv/bin/uvicorn app.main:app --port 8000
@@ -222,13 +264,14 @@ PYTHONPATH=. .venv/bin/python scripts/smoke_tools.py    # data tools
 |-------|--------|-----|
 | LLM | Gemma 4 (`google/gemma-4-31b-it:free` primary, 26b-a4b fallback) | Hackathon requires Gemma 4 |
 | LLM gateway | OpenRouter free tier + BYOK Google AI Studio | $0, OpenAI-compatible API, escapes shared free-tier rate limits |
-| Multimodal | Gemma 4 vision via OpenAI-format `image_url` content-part | Single endpoint for text and image inputs |
+| Multimodal | Gemma 4 vision via OpenAI-format `image_url` content-part; native bounding-box detection (yxyx normalized 0-1000) | Single endpoint for text + image; box detection drives the dossier overlays |
 | Backend | Python 3.13 + FastAPI + uvicorn + httpx | Async-native, SSE-friendly |
 | Frontend | React via Babel-standalone (single `index.html`, served by FastAPI) | No build step, single deploy, no CORS |
-| Map | Leaflet + OSM/CARTO tiles | Free, no API key |
-| Geocoding | Nominatim → US Census Geocoder fallback | Both free; Census has authoritative US TIGER coverage |
-| Street View | Google Street View Static API (metadata-first) | $200/mo Maps Platform free credit covers 28K images/mo |
-| Data sources | FEMA NFHL · Chicago 311 · USGS Water Services · NOAA NWS · Open-Meteo · GDELT | All free, no auth |
+| Map | Leaflet + OSM/CARTO tiles; SVG overlay for vision-agent bounding boxes | Free, no API key |
+| Geocoding | Nominatim → US Census Geocoder fallback | Both free; Census has authoritative US TIGER coverage and returns county FIPS for the regional agent |
+| Street View | Google Street View Static API (metadata-first, bearing-aimed at the building) | $200/mo Maps Platform free credit covers 28K images/mo |
+| Satellite | Mapbox Static Images API (`satellite-v9` zoom 17) | 50K free static loads/mo per account |
+| Data sources | FEMA NFHL + NRI · Chicago/NYC/SF/Austin 311 · Chicago/SF/LA/Austin building permits · USGS Water Services · NOAA NWS · Open-Meteo · GDELT | All free, no auth (NRI exposed via FEMA's RAPT ArcGIS REST endpoint) |
 | Streaming | Server-Sent Events (POST + ReadableStream on the client) | Simpler than WebSocket; survives proxies |
 | Hosting | Hugging Face Spaces (Docker SDK) | Free, single-URL deploy |
 
@@ -242,36 +285,42 @@ No database. No PII stored. Everything computed per-request.
 backend/
 ├── app/
 │   ├── main.py                FastAPI + CORS + static mount
-│   ├── config.py              env + model IDs
+│   ├── config.py              env + model IDs + 3rd-party keys
 │   ├── api/
 │   │   ├── health.py          GET /api/health
 │   │   └── assess.py          POST /api/assess (SSE)
 │   ├── agents/
 │   │   ├── orchestrator.py    parallel-then-sequential runner
-│   │   ├── fema_agent.py
-│   │   ├── local_agent.py     Chicago-only 311
+│   │   ├── fema_agent.py      property-level FEMA flood zone
+│   │   ├── local_agent.py     city-aware: 311 + building permits
 │   │   ├── weather_agent.py   USGS + NOAA + Open-Meteo
 │   │   ├── news_agent.py      GDELT 6mo
 │   │   ├── archive_agent.py   GDELT 24mo
-│   │   ├── streetview_agent.py  Gemma 4 vision (multimodal)
-│   │   ├── risk_agent.py      Gemma 4 reasoning showcase
+│   │   ├── regional_risk_agent.py  FEMA NRI county-level multi-hazard
+│   │   ├── satellite_agent.py    Gemma 4 vision (bird's-eye, bbox)
+│   │   ├── streetview_agent.py   Gemma 4 vision (eye-level, bbox)
+│   │   ├── risk_agent.py      multimodal synthesis (2 images + 7 data)
 │   │   └── advisor_agent.py   catalog-driven, no inventing, multilingual
 │   ├── tools/
-│   │   ├── geocoder.py        Nominatim → Census fallback
+│   │   ├── geocoder.py        Nominatim → Census (returns county FIPS)
 │   │   ├── fema.py            FEMA NFHL ArcGIS REST
-│   │   ├── chicago_311.py     Socrata SODA (WIB/SFL)
+│   │   ├── chicago_311.py     Socrata SODA — generic, city-aware
+│   │   ├── building_permits.py  Socrata — new construction + renovations
+│   │   ├── nri_county.py      FEMA NRI via RAPT ArcGIS REST
+│   │   ├── streetview.py      Google SV Static (metadata-first, bearing-aimed)
+│   │   ├── mapbox.py          Mapbox Static Images (satellite + outdoors)
 │   │   ├── usgs.py            stream gauges
 │   │   ├── noaa.py            forecast + flood alerts
 │   │   ├── open_meteo.py      flood + precipitation
-│   │   ├── gdelt.py           DOC API + per-IP rate-limit lock
-│   │   └── streetview.py      Google SV Static (metadata-first, bearing-aimed)
+│   │   └── gdelt.py           DOC API + per-IP rate-limit lock
 │   ├── llm/
 │   │   ├── client.py          OpenRouter wrapper, 429+5xx retries
-│   │   └── prompts.py         system prompts per agent
+│   │   └── prompts.py         layered-signal system prompts
 │   └── data/
+│       ├── cities.py              5-city registry (Chicago, NYC, SF, LA, Austin)
 │       ├── insurance_catalog.py   curated REAL products
 │       └── languages.py           7-language registry + prompt directive
-├── scripts/                   smoke tests (basic, tools, vision)
+├── scripts/                   smoke tests (basic, tools, vision, bbox, cities)
 ├── static/
 │   └── index.html             single-file React + Leaflet frontend
 ├── Dockerfile                 HF Spaces ready (COPYs app/ + static/)
@@ -295,15 +344,22 @@ FLOODIQ_BACKEND_SPEC.md        original 1086-line build spec
 - **No write actions on behalf of the user.** No auto-purchasing
   insurance, no auto-filing claims. The advisor surfaces *what to do*
   and *who to call*; the user does it.
-- **No follow-up conversation (yet).** The dossier is one-shot in
-  v0.7. Multi-turn function-calling chat is on the roadmap.
-- **Local 311 is Chicago-only by design.** Adding NYC, Houston, etc.
-  is one Python file each in `app/tools/`. The architecture is ready;
-  the data integrations aren't.
+- **No follow-up conversation (yet).** The dossier is one-shot.
+  Multi-turn function-calling chat is on the roadmap.
+- **5 Tier-1 cities only for 311 + permits.** Chicago, NYC, SF, LA,
+  Austin. Adding Boston / Houston / Miami / Seattle is one registry
+  entry plus per-city flood-category mapping each — the architecture
+  is parameterized; the integrations aren't (Boston uses CKAN not
+  Socrata; Houston / Miami / Seattle have working APIs but different
+  field names). NRI multi-hazard works for **all** US counties.
 - **No NOAA Storm Events DB integration.** That dataset only exists as
   CSV bulk-download per year; ingesting it for a hackathon is
   disproportionate. We use GDELT 24-month news as a proxy for
   historical flood track record.
+- **No real elevation contours.** Tried and dropped — Mapbox outdoors
+  doesn't show contours in dense urban areas (verified for Chicago
+  and Atlanta), and FEMA's Topo basemap is too sparse for flat metros.
+  The satellite agent's catchment analysis fills the gap.
 
 See [STATUS.md](STATUS.md) for a fuller snapshot of what's working,
 what wobbles, and what's left.
@@ -320,16 +376,24 @@ What FlutIQ demonstrates from the Gemma 4 capabilities surface:
 
 - **Native function calling** — verified end-to-end on the `:free`
   tier (see [`scripts/smoke_test.py`](backend/scripts/smoke_test.py))
-- **Reasoning mode** (`reasoning: {enabled: true}`) — the risk analyst
-  agent's chain-of-thought trace is preserved on every dossier and
+- **Reasoning mode** (`reasoning: {enabled: true}`) — the risk
+  analyst's chain-of-thought trace is preserved on every dossier and
   shown in the UI behind a toggle
-- **Multimodal vision** — the Street View agent feeds an actual
-  photograph of the property to Gemma 4 and gets back structured,
-  honest visual reasoning (see [`scripts/smoke_test_vision.py`](backend/scripts/smoke_test_vision.py))
-- **Agentic workflows** — 8 agents, parallel-then-sequential
-  orchestration, SSE streaming
-- **Long context** (256K) — comfortably handles the full data-bundle
-  prompt for the risk analyst (~5–8K tokens)
+- **Multimodal vision in two dedicated agents** — Street View
+  (eye-level) and Mapbox satellite (bird's-eye) each run their own
+  Gemma 4 vision call (see [`scripts/smoke_test_vision.py`](backend/scripts/smoke_test_vision.py))
+- **Native bounding-box detection** — both vision agents return
+  yxyx normalized 0-1000 boxes that the dossier overlays as SVG
+  (see [`scripts/smoke_test_bbox.py`](backend/scripts/smoke_test_bbox.py))
+- **Interleaved multimodal reasoning** — the risk analyst receives
+  *both raw images* alongside structured findings from 7 data agents
+  in a single Gemma 4 inference call. Reasoning trace cites which
+  layer each claim comes from (Property / Neighborhood / Visual /
+  Regional)
+- **Agentic workflows** — 9 agents, parallel-then-sequential
+  orchestration, SSE streaming, graceful per-agent error handling
+- **Long context** (256K) — comfortably handles 2 images + the
+  full data-bundle prompt (~8–12K text tokens + image tokens)
 - **140+ language support** — user-facing dossier copy generated in
   any of 7 supported languages with a single prompt directive,
   preserving English product names and URLs
@@ -343,10 +407,12 @@ without rephrasing or re-prompting.
 
 ## Credits
 
-- **Data sources** — FEMA, City of Chicago, USGS, NOAA, Open-Meteo,
-  GDELT, OpenStreetMap / CARTO. All free and public.
+- **Data sources** — FEMA (NFHL + NRI via RAPT), USGS, NOAA, Open-Meteo,
+  GDELT, OpenStreetMap / CARTO, plus city open-data portals (Chicago,
+  NYC, SF, LA, Austin). All free and public.
 - **Imagery** — Google Street View (free tier under the Maps Platform
-  monthly credit).
+  monthly credit) for eye-level; Mapbox Static Images (50K free
+  static loads/month) for satellite.
 - **Hackathon** — [Gemma 4 Good Hackathon](https://www.kaggle.com/competitions/gemma-4-good) by Google + Kaggle.
 - **Built with** — [Claude Code](https://claude.com/claude-code) (Anthropic's CLI for Claude).
 - **Mascot** — Tiny droplet of agency in a sea of insurance jargon.
