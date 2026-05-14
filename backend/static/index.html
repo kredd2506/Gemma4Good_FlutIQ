@@ -1053,7 +1053,9 @@ const SearchScreen = ({ onSubmit }) => {
         <details className="learn-more">
           <summary>How it works</summary>
           <div className="learn-body">
-            <p>Nine specialist Gemma 4 agents query public datasets in parallel — FEMA flood zones and the county-level multi-hazard NRI, city 311 reports and building permits across five Tier-1 cities, USGS stream gauges, NOAA forecasts, GDELT news, plus dedicated vision agents that run Gemma 4 multimodal on a satellite view and a Street View photograph — then synthesize a personalized dossier with a verified-catalog insurance recommendation, a before-you-sign checklist, and a prioritized drainage / infiltration / barrier action plan, in your chosen language.</p>
+            <p><strong>1. Question.</strong> Is FEMA's flood zone telling the whole story for this address? Usually not. FEMA maps riverine and coastal flooding only; most urban flood damage comes from sewer backup, which FEMA doesn't map.</p>
+            <p><strong>2. Investigate.</strong> Nine specialist Gemma 4 agents check public data in parallel: FEMA flood zone + multi-hazard NRI, 311 records + building permits in 5 Tier-1 cities, USGS gauges, NOAA forecasts, news — plus Gemma 4 vision on a satellite view and a Street View photo. ~30–60s end-to-end.</p>
+            <p><strong>3. Decide.</strong> A risk analyst synthesizes everything in one Gemma 4 reasoning call. An advisor turns it into a bottom-line verdict, a before-you-sign checklist tied to the evidence that flagged each item, a drainage / infiltration / barrier action plan, and an insurance recommendation pulled from a verified catalog of real products. In your chosen language.</p>
             <div className="learn-sources">FEMA NFHL · FEMA NRI · 5-city 311 + permits · USGS · NOAA · Open-Meteo · GDELT · Mapbox satellite · Google Street View</div>
           </div>
         </details>
