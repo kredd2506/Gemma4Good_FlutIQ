@@ -16,6 +16,52 @@ CENSUS_URL = (
     "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress"
 )
 
+# Nominatim `class` values that imply a non-residential building/site.
+_COMMERCIAL_CLASSES = {
+    "amenity", "tourism", "shop", "office", "industrial",
+    "leisure", "healthcare", "aeroway", "railway", "military",
+}
+
+# Nominatim `type` values that imply commercial / institutional.
+_COMMERCIAL_TYPES = {
+    "commercial", "industrial", "office", "retail", "warehouse",
+    "hotel", "motel", "school", "kindergarten", "college", "university",
+    "hospital", "clinic", "pharmacy",
+    "church", "cathedral", "mosque", "synagogue", "temple",
+    "airport", "aerodrome", "terminal", "train_station", "bus_station",
+    "government", "public_building", "civic", "fire_station",
+    "police", "courthouse", "embassy", "townhall",
+    "stadium", "sports_centre", "museum", "library", "attraction",
+}
+
+# Nominatim `type` values that confirm residential — short-circuit any
+# ambiguous parent class.
+_RESIDENTIAL_TYPES = {
+    "house", "apartments", "residential", "detached",
+    "semi_detached", "terrace", "bungalow", "dormitory",
+}
+
+
+def _classify_property_type(r: dict) -> str:
+    """Return 'residential' or 'commercial'. Defaults to residential
+    unless Nominatim metadata clearly indicates otherwise — FlutIQ's
+    audience is homeowners, so we only divert on a confident commercial
+    signal."""
+    osm_class = (r.get("class") or "").lower()
+    osm_type = (r.get("type") or "").lower()
+    name = (r.get("name") or "").strip()
+
+    if osm_type in _RESIDENTIAL_TYPES:
+        return "residential"
+    if osm_class in _COMMERCIAL_CLASSES or osm_type in _COMMERCIAL_TYPES:
+        return "commercial"
+    # A `class=building` hit with an OSM-tagged building name is almost
+    # always an institutional/commercial building — pure street addresses
+    # come back with no `name` populated.
+    if osm_class == "building" and name:
+        return "commercial"
+    return "residential"
+
 # US state name → 2-letter abbrev (just enough to keep "state" useful for
 # downstream agents that compare on names like "Illinois").
 _US_STATES = {
@@ -62,6 +108,7 @@ async def _try_nominatim(address: str) -> Optional[dict]:
         "city": addr.get("city") or addr.get("town") or addr.get("village") or "",
         "state": addr.get("state", ""),
         "county": addr.get("county", ""),
+        "property_type": _classify_property_type(r),
         "source": "nominatim",
     }
 
@@ -102,6 +149,11 @@ async def _try_census(address: str) -> Optional[dict]:
         "city": (components.get("city") or "").title(),
         "state": state_full,
         "county": county_name,
+        # Census Geocoder resolves TIGER/Line street addresses and doesn't
+        # expose building-type metadata. Default to residential — the
+        # commercial-buildings-with-names case is handled by Nominatim,
+        # which we try first.
+        "property_type": "residential",
         "source": "census",
     }
 

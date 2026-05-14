@@ -264,6 +264,7 @@ def _compile_dossier(geo: GeoCtx, results: dict) -> dict:
         "city": geo.get("city", ""),
         "state": geo.get("state", ""),
         "county": geo.get("county", ""),
+        "property_type": geo.get("property_type", "residential"),
         "fema": results.get("fema", {}),
         "local": results.get("local", {}),
         "weather": results.get("weather", {}),

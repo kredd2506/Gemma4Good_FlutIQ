@@ -49,9 +49,33 @@ async def run_advisor_agent(
     city = geo.get("city", "") or ""
     state = geo.get("state", "") or ""
     state_code = _STATE_TO_CODE.get(state.lower(), "")
+    property_type = geo.get("property_type", "residential")
+
+    resources = resources_for_city(city)
+
+    # FlutIQ's catalog, prompts, and copy are tuned for homeowner decisions.
+    # For a commercial address, residential-flavored advice would mislead —
+    # skip the LLM call and return a graceful explanation instead. The
+    # risk/data agents already ran, so the dossier still shows FEMA, NRI,
+    # vision, etc. — only the homeowner-specific sections are suppressed.
+    if property_type == "commercial":
+        return {
+            "tldr": (
+                "FlutIQ is built for residential decisions — buying, renting, "
+                "or living in a home. This address resolved to a commercial "
+                "property, so our insurance and homeowner action recommendations "
+                "aren't shown. The flood risk findings still apply to the "
+                "building; for coverage, talk to a commercial insurance broker "
+                "who can quote commercial property and commercial flood policies."
+            ),
+            "insurance_recommendations": [],
+            "before_you_move_in": [],
+            "mitigation_actions": [],
+            "key_resources": resources,
+            "summary": "Commercial property — residential advice skipped",
+        }
 
     products = products_available_in(state_code)
-    resources = resources_for_city(city)
 
     catalog_for_prompt = [
         {

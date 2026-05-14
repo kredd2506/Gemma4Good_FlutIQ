@@ -545,8 +545,8 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
 // ── DATA FIXTURES ──────────────────────────────────────────────────────────
 const EXAMPLES = [
   { label: "4521 S Drexel Blvd, Chicago", code: "60653" },
-  { label: "350 5th Ave, New York NY",    code: "10118" },
-  { label: "1 World Way, Los Angeles CA", code: "90045" },
+  { label: "Greenwich Village, New York NY", code: "10011" },
+  { label: "Echo Park, Los Angeles CA",   code: "90026" },
   { label: "Houston Heights, TX",         code: "77008" },
 ];
 
@@ -1167,6 +1167,7 @@ const mapDossier = (raw) => {
     satellite: raw.satellite || {},
     local: raw.local || {},
     regional: raw.regional || {},
+    property_type: raw.property_type || "residential",
   };
 };
 
@@ -1177,23 +1178,28 @@ const DossierScreen = ({ onBack, dossier }) => {
   // Section numbers depend on which conditional sections render. We
   // precompute them so the rendering JSX stays readable. The order
   // here mirrors the visual order in the dossier below.
+  // Commercial properties suppress the homeowner-specific sections
+  // (before-you-sign, actions, insurance) — see commercial banner below.
+  const isCommercial = D.property_type === "commercial";
   const _sectionNums = useMemo(() => {
-    const hasBefore   = (D.before_you_move_in || []).length > 0;
+    const hasBefore   = !isCommercial && (D.before_you_move_in || []).length > 0;
+    const hasActions  = !isCommercial;
+    const hasInsurance = !isCommercial;
     const hasImages   = D.streetview?.available || D.satellite?.available;
     const hasRegional = D.regional?.available;
     let n = 0;
     const fmt = () => "§" + String(++n).padStart(2, "0");
     return {
-      before:    hasBefore   ? fmt() : null,
-      actions:   fmt(),
-      insurance: fmt(),
-      images:    hasImages   ? fmt() : null,
+      before:    hasBefore    ? fmt() : null,
+      actions:   hasActions   ? fmt() : null,
+      insurance: hasInsurance ? fmt() : null,
+      images:    hasImages    ? fmt() : null,
       gap:       fmt(),
-      regional:  hasRegional ? fmt() : null,
+      regional:  hasRegional  ? fmt() : null,
       signals:   fmt(),
       news:      fmt(),
     };
-  }, [D]);
+  }, [D, isCommercial]);
   const [showBoxes, setShowBoxes] = useState(true);
   const [imageTab, setImageTab] = useState("streetview");  // "streetview" | "satellite" | "topo"
   return (
@@ -1218,7 +1224,19 @@ const DossierScreen = ({ onBack, dossier }) => {
           </div>
         </div>
 
-        {D.plain_verdict && (
+        {isCommercial && (
+          <div style={{margin: "20px 0 14px", padding: "14px 16px 16px", background: "var(--surface)", border: "1px solid var(--line)", borderLeft: "4px solid var(--amber)", borderRadius: 12, boxShadow: "0 6px 16px rgba(22,22,22,0.04)"}}>
+            <div style={{display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--amber)", marginBottom: 8}}>
+              <span>◆ Commercial property</span>
+              <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· homeowner advice not shown</span>
+            </div>
+            <p style={{margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--ink)"}}>
+              FlutIQ is built for residential decisions — buying, renting, or living in a home. This address resolved to a commercial property, so the homeowner action plan, insurance recommendations, and before-you-sign checklist are hidden. The flood risk findings, multi-hazard profile, and visual analysis below still apply to the building. For coverage decisions, talk to a commercial insurance broker.
+            </p>
+          </div>
+        )}
+
+        {!isCommercial && D.plain_verdict && (
           <div style={{margin: "20px 0 14px", padding: "16px 18px 18px", background: "var(--surface)", border: "1px solid var(--line)", borderLeft: "4px solid var(--accent)", borderRadius: 12, boxShadow: "0 6px 16px rgba(22,22,22,0.04)"}}>
             <div style={{display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 8}}>
               <span>◆ Bottom line</span>
@@ -1252,7 +1270,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           );
         })()}
 
-        {D.before_you_move_in.length > 0 && (
+        {!isCommercial && D.before_you_move_in.length > 0 && (
           <Section
             num={_sectionNums.before}
             icon={<Icon name="search" color="var(--purple)" size={16}/>}
@@ -1273,6 +1291,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           </Section>
         )}
 
+        {!isCommercial && (
         <Section
           num={_sectionNums.actions}
           icon={<Icon name="plus" color="var(--teal)" size={16}/>}
@@ -1318,7 +1337,9 @@ const DossierScreen = ({ onBack, dossier }) => {
             });
           })()}
         </Section>
+        )}
 
+        {!isCommercial && (
         <Section
           num={_sectionNums.insurance}
           icon={<Icon name="dollar" color="var(--purple)" size={16}/>}
@@ -1362,6 +1383,7 @@ const DossierScreen = ({ onBack, dossier }) => {
             </div>
           )}
         </Section>
+        )}
 
         {(D.streetview?.available || D.satellite?.available) && (() => {
           const tabs = [
