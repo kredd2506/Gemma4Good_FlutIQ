@@ -599,6 +599,12 @@ The default `:free` tier is a shared upstream pool that 429s after
 ## Recent commit log
 
 ```
+a05c28d  docs: add FlutIQ Edge setup section to README
+a5e8d7a  frontend: FlutIQ Edge callout + dark mode now the default
+234c667  frontend: rebuild "How it works" from FlutIQ_HowItWorks_Rewrite.md spec
+48f7b4a  frontend: restructure "How it works" — Question / Investigate / Decide
+6ef386c  frontend: refresh stale "How it works" + methodology copy + bump badge
+677607c  docs: refresh README + STATUS for v0.15.3 + v0.15.4
 147b9e6  v0.15.4: risk_agent plain_verdict empty for zh + ar — language fix
 0565e0d  v0.15.3: make non-English dossiers actually work end-to-end
 c874de0  docs: refresh README + STATUS for v0.15.1 + v0.15.2
