@@ -185,14 +185,29 @@
   .chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translateY(-1px) rotate(-1deg); }
   .chip .mono { color: var(--ink-4); margin-left: 6px; font-size: 11px; }
 
-  .learn-more { margin-top: 40px; font-size: 13px; color: var(--ink-3); }
-  .learn-more summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; user-select: none; }
-  .learn-more summary::-webkit-details-marker { display: none; }
-  .learn-more summary::before { content: "+"; font-family: 'JetBrains Mono', monospace; color: var(--ink-4); width: 14px; display: inline-block; }
-  .learn-more[open] summary::before { content: "−"; }
-  .learn-body { margin-top: 12px; padding-left: 14px; max-width: 520px; }
-  .learn-body p { margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
-  .learn-sources { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); letter-spacing: 0.04em; }
+  /* "How it works" — promoted from a collapsible to a full section with cards + trust bar. */
+  .how-it-works { margin-top: 56px; padding-top: 40px; border-top: 0.5px solid var(--line); }
+  .hiw-header { text-align: center; max-width: 640px; margin: 0 auto 32px; }
+  .hiw-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-4); display: block; }
+  .hiw-headline { font-size: 22px; font-weight: 500; line-height: 1.3; margin: 10px 0 12px; color: var(--ink); }
+  .hiw-intro { font-size: 14.5px; line-height: 1.55; color: var(--ink-2); margin: 0; }
+  .hiw-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 36px; }
+  @media (max-width: 760px) { .hiw-steps { grid-template-columns: 1fr; } }
+  .hiw-step { position: relative; padding: 18px; border: 0.5px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .hiw-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.16em; color: var(--accent); display: block; margin-bottom: 10px; }
+  .hiw-title { font-size: 17px; font-weight: 500; color: var(--ink); margin: 0 0 4px; }
+  .hiw-subline { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); margin: 0 0 10px; }
+  .hiw-detail { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); margin: 0; }
+  /* Subtle dashed connector between cards on desktop — hints progression without dominating. */
+  .hiw-step:not(:last-child)::after {
+    content: ""; position: absolute; top: 50%; right: -12px; width: 8px;
+    border-top: 1px dashed var(--line); transform: translateY(-50%);
+  }
+  @media (max-width: 760px) { .hiw-step:not(:last-child)::after { display: none; } }
+  .hiw-trust { text-align: center; padding-top: 4px; }
+  .hiw-trust-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-4); display: block; margin-bottom: 10px; }
+  .hiw-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .hiw-pill { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 10px; border: 0.5px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink-3); }
 
   .agents-grid {
     flex: 1;
@@ -1050,15 +1065,49 @@ const SearchScreen = ({ onSubmit }) => {
           ))}
         </div>
 
-        <details className="learn-more">
-          <summary>How it works</summary>
-          <div className="learn-body">
-            <p><strong>1. Question.</strong> Is FEMA's flood zone telling the whole story for this address? Usually not. FEMA maps riverine and coastal flooding only; most urban flood damage comes from sewer backup, which FEMA doesn't map.</p>
-            <p><strong>2. Investigate.</strong> Nine specialist Gemma 4 agents check public data in parallel: FEMA flood zone + multi-hazard NRI, 311 records + building permits in 5 Tier-1 cities, USGS gauges, NOAA forecasts, news — plus Gemma 4 vision on a satellite view and a Street View photo. ~30–60s end-to-end.</p>
-            <p><strong>3. Decide.</strong> A risk analyst synthesizes everything in one Gemma 4 reasoning call. An advisor turns it into a bottom-line verdict, a before-you-sign checklist tied to the evidence that flagged each item, a drainage / infiltration / barrier action plan, and an insurance recommendation pulled from a verified catalog of real products. In your chosen language.</p>
-            <div className="learn-sources">FEMA NFHL · FEMA NRI · 5-city 311 + permits · USGS · NOAA · Open-Meteo · GDELT · Mapbox satellite · Google Street View</div>
+        <section className="how-it-works">
+          <div className="hiw-header">
+            <span className="hiw-eyebrow">How it works</span>
+            <h2 className="hiw-headline">Three steps from address to action plan.</h2>
+            <p className="hiw-intro">FEMA flood maps miss the risks that actually hit homeowners. FlutIQ fills the gap with AI that checks what the maps won't.</p>
           </div>
-        </details>
+
+          <div className="hiw-steps">
+            <div className="hiw-step">
+              <span className="hiw-num">01</span>
+              <h3 className="hiw-title">Spot the gap</h3>
+              <p className="hiw-subline">FEMA only maps rivers and coasts.</p>
+              <p className="hiw-detail">Most urban flood damage comes from sewer backup, storm surge, and poor drainage — none of which appear on official flood maps. If your zone says "minimal risk," it might be wrong.</p>
+            </div>
+            <div className="hiw-step">
+              <span className="hiw-num">02</span>
+              <h3 className="hiw-title">Investigate everything</h3>
+              <p className="hiw-subline">7 AI agents. 9 public data sources. ~60 seconds.</p>
+              <p className="hiw-detail">Flood zones, 311 complaints, building permits, river gauges, weather forecasts, news reports — even satellite and street-level imagery. All checked in parallel, all synthesized by AI reasoning.</p>
+            </div>
+            <div className="hiw-step">
+              <span className="hiw-num">03</span>
+              <h3 className="hiw-title">Get your dossier</h3>
+              <p className="hiw-subline">A verdict, a checklist, and a plan.</p>
+              <p className="hiw-detail">Your personalized risk report includes a bottom-line score, a before-you-sign checklist with evidence, drainage and barrier recommendations, and real insurance products matched to your risk — in your language.</p>
+            </div>
+          </div>
+
+          <div className="hiw-trust">
+            <span className="hiw-trust-label">Powered by 9 public data sources</span>
+            <div className="hiw-pills">
+              <span className="hiw-pill">FEMA NFHL</span>
+              <span className="hiw-pill">FEMA NRI</span>
+              <span className="hiw-pill">311 + Permits</span>
+              <span className="hiw-pill">USGS</span>
+              <span className="hiw-pill">NOAA</span>
+              <span className="hiw-pill">Open-Meteo</span>
+              <span className="hiw-pill">GDELT</span>
+              <span className="hiw-pill">Mapbox Satellite</span>
+              <span className="hiw-pill">Street View</span>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
