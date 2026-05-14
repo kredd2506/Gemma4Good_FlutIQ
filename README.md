@@ -359,6 +359,132 @@ PYTHONPATH=. .venv/bin/python scripts/smoke_tools.py    # data tools
 
 ---
 
+## FlutIQ Edge — run on your laptop
+
+The HF Space ([kredd25-flutiq.hf.space](https://kredd25-flutiq.hf.space))
+runs **FlutIQ Cloud** — the main deployment, what judges click. **FlutIQ
+Edge** is the secondary mode: the same nine agents and the same dossier,
+but Gemma 4 runs **on your laptop** via [Ollama](https://ollama.com)
+instead of in the cloud. No API key, no internet for inference, no
+address leaving your device.
+
+This is **Gemma-native**: possible only because Gemma 4 is open-weight
+under Apache 2.0. Cloud-only LLMs literally can't do this.
+
+### Why you'd want Edge
+
+- **Privacy.** The address you investigate never leaves your laptop.
+  Data agents still hit public APIs (FEMA, NOAA, etc.) but the LLM
+  reasoning happens locally.
+- **Resilience.** During a flood event, when cell towers go down and
+  cloud APIs are unreachable, a response team with a laptop can still
+  assess risk for their community.
+- **No rate limits.** Speed is bounded by hardware, not by a shared
+  inference pool.
+
+### Hardware
+
+| Model tag | Quantized size | Active params | Recommended RAM |
+|---|---|---|---|
+| `gemma4:e4b` | ~3 GB | 4B (dense) | 8 GB+ |
+| `gemma4:26b-a4b` | ~16–18 GB | 3.8B (MoE) | 24 GB |
+| `gemma4:31b` | ~20 GB | 31B (dense) | 32 GB+ |
+
+**Start with `gemma4:e4b`** — it runs on most laptops and a full
+9-agent assessment completes in ~3 min on an M4 Pro 24 GB. Bump up
+to `gemma4:26b-a4b` if your machine has room and you want
+26B-class reasoning at 4B-class speed (MoE only activates 3.8B
+parameters per token).
+
+### Setup
+
+1. **Install Ollama**:
+   ```bash
+   brew install ollama
+   # or: download from https://ollama.com/download
+   ```
+
+2. **Start the Ollama server** (leave running in one terminal):
+   ```bash
+   ollama serve
+   ```
+
+3. **Pull the model** (in another terminal):
+   ```bash
+   ollama pull gemma4:e4b
+   ```
+
+4. **Start FlutIQ in Edge mode**:
+   ```bash
+   cd Gemma4Good_FlutIQ/backend
+
+   # one-time venv if you haven't already
+   python3.13 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+
+   cat > .env <<'EOF'
+   INFERENCE_BACKEND=ollama
+   GOOGLE_MAPS_API_KEY=AIzaSy...   # optional, enables Street View tab
+   MAPBOX_ACCESS_TOKEN=pk.eyJ1...   # optional, enables Satellite tab
+   # OPENROUTER_API_KEY not needed in Edge mode
+   EOF
+
+   set -a && source .env && set +a
+   .venv/bin/uvicorn app.main:app --port 8000
+   ```
+
+5. **Open `http://127.0.0.1:8000`**. The chrome wordmark will read
+   "FlutIQ Edge" (with green accents) instead of "FlutIQ Cloud", so
+   you can confirm you're talking to local Ollama.
+
+### Verify
+
+```bash
+curl -s http://127.0.0.1:8000/api/health
+# → {"status":"ok","inference_backend":"ollama","model":"gemma4:e4b","openrouter_key_configured":false}
+```
+
+Then run an assessment from the browser. Indicative end-to-end times:
+
+| Hardware | Address | Time |
+|---|---|---|
+| MacBook Pro M4 Pro 24 GB | Chicago Drexel | ~3 min |
+| MacBook Pro M2/M3 16 GB | Chicago Drexel | ~5–7 min |
+
+### Caveats
+
+- **Data tools still need internet.** FEMA NFHL + NRI, NOAA, USGS,
+  city 311 / permits, GDELT, Google Street View, and Mapbox are all
+  public APIs and run from your laptop *out* to those services. Only
+  the LLM inference is fully local. A truly offline deployment would
+  pre-cache the data layers per county — that's listed as future
+  work in [STATUS.md](STATUS.md).
+- **Reasoning trace format may differ** from cloud. OpenRouter
+  surfaces structured `reasoning_details`; Ollama uses an inline
+  `<|think|>` block. The client parses both, but the UI rendering
+  is calibrated for OpenRouter — the trace text will still appear,
+  just possibly without per-step structure.
+- **Speed.** Local is slower than cloud. That's expected and not
+  a regression — the tradeoff buys you privacy and resilience.
+
+### Switching back to Cloud
+
+Unset (or set to `openrouter`) the env var and restart:
+
+```bash
+unset INFERENCE_BACKEND      # or: export INFERENCE_BACKEND=openrouter
+.venv/bin/uvicorn app.main:app --port 8000
+```
+
+Same app, same agents, different inference endpoint.
+
+For the deeper design rationale behind Edge (why open-weight matters,
+how it serves the hackathon's "local frontier intelligence" framing,
+the full hardware comparison), see
+[FLUTIQ_OLLAMA_LOCAL.md](FLUTIQ_OLLAMA_LOCAL.md).
+
+---
+
 ## Tech stack
 
 | Layer | Choice | Why |
