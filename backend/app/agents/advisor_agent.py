@@ -187,8 +187,24 @@ Return a JSON object with:
 }}
 
 CRITICAL: every insurance_recommendations entry MUST have a product_id that
-exists in the catalog above. Do not add products that aren't in the catalog.
-Do not invent prices or company names. Return ONLY the JSON object."""
+EXACTLY matches an id from the catalog above (e.g. "nfip_standard",
+"homeowners_sewer_rider", "private_flood", "parametric_flood"). The
+product_id is a technical identifier — copy it LETTER FOR LETTER from the
+catalog, even when generating the rest of the output in another language.
+Translating product_id causes the entry to be dropped.
+
+The same rule applies to these enum values — copy verbatim, never translate:
+  - mitigation_actions[].bucket  ∈ {"drainage", "infiltration", "barrier"}
+  - before_you_move_in[].cite    ∈ {"FEMA", "311", "Permits", "City sewer",
+                                     "Satellite", "Street view", "NRI",
+                                     "USGS/NOAA"}
+  - insurance_recommendations[].priority ∈ {"start_here", "also_consider",
+                                             "only_if"}
+  - mitigation_actions[].effort  ∈ {"diy", "contractor", "professional"}
+  - mitigation_actions[].impact  ∈ {"low", "medium", "high"}
+
+Do not add products that aren't in the catalog. Do not invent prices or
+company names. Return ONLY the JSON object."""
 
     response = await call_gemma4(
         messages=[

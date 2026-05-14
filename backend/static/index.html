@@ -435,6 +435,224 @@ const LANGUAGES = [
   { code: "tl", label: "Tagalog",        native: "Tagalog" },
 ];
 
+// UI chrome translations — labels, section titles, headlines.
+// The model-generated prose (verdict, NRI interpretations, vision findings,
+// mitigation steps) is translated server-side; this dict covers ONLY the
+// static frontend strings that never round-trip through Gemma. Non-English
+// translations should be reviewed by native speakers before production.
+const UI_STRINGS = {
+  en: {
+    risk_low:                  "Low risk",
+    risk_medium:               "Medium risk",
+    risk_high:                 "High risk",
+    headline_high_femasafe_pre: "High urban flood risk —",
+    headline_high_femasafe_em:  "despite FEMA saying \"minimal\"",
+    headline_high_pre:          "High flood risk —",
+    headline_high_em:           "FEMA confirms a hazard zone",
+    headline_med_femasafe_pre:  "Moderate risk that FEMA misses —",
+    headline_med_femasafe_em:   "urban flood signals are present",
+    headline_med_pre:           "Moderate flood risk",
+    headline_low_femasafe_pre:  "Low risk on this block —",
+    headline_low_femasafe_em:   "FEMA and local signals agree",
+    headline_low_pre:           "Low risk",
+    section_before:    "Before you sign — what to verify this week",
+    section_actions:   "What to do once you live there",
+    section_insurance: "Insurance options, in plain English",
+    section_images:    "What we saw at the property",
+    section_gap:       "Why FEMA's flood map isn't the whole story",
+    section_regional:  "Wider neighborhood — beyond just flooding",
+    section_signals:   "The raw signals we looked at",
+    section_news:      "Recent local flood news",
+    bottom_line_label: "Bottom line",
+    bottom_line_sub:   "what a flood-savvy friend would tell you",
+    synthesized_from:  "Synthesized from",
+    commercial_label:  "Commercial property",
+    commercial_sub:    "homeowner advice not shown",
+    commercial_body:   "FlutIQ is built for residential decisions — buying, renting, or living in a home. This address resolved to a commercial property, so the homeowner action plan, insurance recommendations, and before-you-sign checklist are hidden. The flood risk findings, multi-hazard profile, and visual analysis below still apply to the building. For coverage decisions, talk to a commercial insurance broker.",
+  },
+  es: {
+    risk_low:                  "Riesgo bajo",
+    risk_medium:               "Riesgo moderado",
+    risk_high:                 "Riesgo alto",
+    headline_high_femasafe_pre: "Alto riesgo de inundación urbana —",
+    headline_high_femasafe_em:  "a pesar de que FEMA dice \"mínimo\"",
+    headline_high_pre:          "Alto riesgo de inundación —",
+    headline_high_em:           "FEMA confirma una zona de peligro",
+    headline_med_femasafe_pre:  "Riesgo moderado que FEMA no detecta —",
+    headline_med_femasafe_em:   "hay señales de inundación urbana",
+    headline_med_pre:           "Riesgo moderado de inundación",
+    headline_low_femasafe_pre:  "Riesgo bajo en esta cuadra —",
+    headline_low_femasafe_em:   "FEMA y las señales locales coinciden",
+    headline_low_pre:           "Riesgo bajo",
+    section_before:    "Antes de firmar — qué verificar esta semana",
+    section_actions:   "Qué hacer una vez que vivas allí",
+    section_insurance: "Opciones de seguro, en lenguaje claro",
+    section_images:    "Lo que vimos en la propiedad",
+    section_gap:       "Por qué el mapa de FEMA no cuenta toda la historia",
+    section_regional:  "Vecindario más amplio — más allá de las inundaciones",
+    section_signals:   "Las señales que examinamos",
+    section_news:      "Noticias locales recientes sobre inundaciones",
+    bottom_line_label: "Lo esencial",
+    bottom_line_sub:   "lo que te diría un amigo experto en inundaciones",
+    synthesized_from:  "Sintetizado de",
+    commercial_label:  "Propiedad comercial",
+    commercial_sub:    "no se muestran consejos para propietarios",
+    commercial_body:   "FlutIQ está hecho para decisiones residenciales — comprar, alquilar o vivir en una casa. Esta dirección se identificó como una propiedad comercial, por lo que el plan de acción del propietario, las recomendaciones de seguro y la lista de verificación previa a la firma están ocultos. Los hallazgos sobre el riesgo de inundación, el perfil multi-peligro y el análisis visual a continuación siguen siendo aplicables al edificio. Para decisiones de cobertura, hable con un corredor de seguros comerciales.",
+  },
+  zh: {
+    risk_low:                  "低风险",
+    risk_medium:               "中等风险",
+    risk_high:                 "高风险",
+    headline_high_femasafe_pre: "城市洪水风险高 —",
+    headline_high_femasafe_em:  "尽管 FEMA 评定为\"极低\"",
+    headline_high_pre:          "洪水风险高 —",
+    headline_high_em:           "FEMA 确认为危险区域",
+    headline_med_femasafe_pre:  "FEMA 未识别的中等风险 —",
+    headline_med_femasafe_em:   "存在城市洪水信号",
+    headline_med_pre:           "中等洪水风险",
+    headline_low_femasafe_pre:  "本街区风险较低 —",
+    headline_low_femasafe_em:   "FEMA 与本地信号一致",
+    headline_low_pre:           "风险较低",
+    section_before:    "签约前 — 本周需要核实的事项",
+    section_actions:   "入住后应该做的事",
+    section_insurance: "保险选项,简明易懂",
+    section_images:    "我们在物业看到的情况",
+    section_gap:       "为什么 FEMA 洪水地图并非全貌",
+    section_regional:  "更大范围的邻里 — 不止于洪水",
+    section_signals:   "我们查看的原始信号",
+    section_news:      "近期本地洪水新闻",
+    bottom_line_label: "核心结论",
+    bottom_line_sub:   "懂洪水的朋友会这样告诉你",
+    synthesized_from:  "综合自",
+    commercial_label:  "商业地产",
+    commercial_sub:    "不显示业主建议",
+    commercial_body:   "FlutIQ 专为居住决策(购房、租房或居住)而设计。此地址识别为商业地产,因此业主行动计划、保险建议和签约前核查清单已被隐藏。下方的洪水风险分析、多灾害概况和视觉分析仍适用于该建筑。如需保险方案,请咨询商业保险经纪人。",
+  },
+  vi: {
+    risk_low:                  "Rủi ro thấp",
+    risk_medium:               "Rủi ro trung bình",
+    risk_high:                 "Rủi ro cao",
+    headline_high_femasafe_pre: "Rủi ro lũ đô thị cao —",
+    headline_high_femasafe_em:  "mặc dù FEMA xếp loại \"tối thiểu\"",
+    headline_high_pre:          "Rủi ro lũ cao —",
+    headline_high_em:           "FEMA xác nhận khu vực nguy hiểm",
+    headline_med_femasafe_pre:  "Rủi ro trung bình mà FEMA bỏ sót —",
+    headline_med_femasafe_em:   "có dấu hiệu lũ đô thị",
+    headline_med_pre:           "Rủi ro lũ trung bình",
+    headline_low_femasafe_pre:  "Rủi ro thấp ở khu này —",
+    headline_low_femasafe_em:   "FEMA và tín hiệu địa phương đồng nhất",
+    headline_low_pre:           "Rủi ro thấp",
+    section_before:    "Trước khi ký — cần kiểm tra tuần này",
+    section_actions:   "Cần làm gì khi đã ở đó",
+    section_insurance: "Các lựa chọn bảo hiểm, giải thích dễ hiểu",
+    section_images:    "Những gì chúng tôi thấy tại địa điểm",
+    section_gap:       "Vì sao bản đồ lũ của FEMA không kể hết câu chuyện",
+    section_regional:  "Khu vực rộng hơn — không chỉ là lũ lụt",
+    section_signals:   "Các tín hiệu nguyên gốc chúng tôi đã xem",
+    section_news:      "Tin tức lũ lụt địa phương gần đây",
+    bottom_line_label: "Tóm lại",
+    bottom_line_sub:   "điều một người bạn am hiểu về lũ sẽ nói với bạn",
+    synthesized_from:  "Tổng hợp từ",
+    commercial_label:  "Bất động sản thương mại",
+    commercial_sub:    "không hiển thị tư vấn cho chủ nhà",
+    commercial_body:   "FlutIQ được xây dựng cho các quyết định nhà ở — mua, thuê, hoặc sinh sống. Địa chỉ này được nhận diện là bất động sản thương mại, vì vậy kế hoạch hành động chủ nhà, đề xuất bảo hiểm, và danh sách kiểm tra trước khi ký đã bị ẩn. Các phát hiện về rủi ro lũ, hồ sơ đa hiểm họa, và phân tích hình ảnh bên dưới vẫn áp dụng cho tòa nhà. Để quyết định về bảo hiểm, hãy liên hệ với một môi giới bảo hiểm thương mại.",
+  },
+  ht: {
+    risk_low:                  "Risk fèb",
+    risk_medium:               "Risk modere",
+    risk_high:                 "Risk wo",
+    headline_high_femasafe_pre: "Gwo risk inondasyon iben —",
+    headline_high_femasafe_em:  "menm si FEMA di \"minim\"",
+    headline_high_pre:          "Gwo risk inondasyon —",
+    headline_high_em:           "FEMA konfime zòn danje",
+    headline_med_femasafe_pre:  "Risk modere ke FEMA pa wè —",
+    headline_med_femasafe_em:   "gen siyal inondasyon iben",
+    headline_med_pre:           "Risk inondasyon modere",
+    headline_low_femasafe_pre:  "Risk fèb nan blok sa a —",
+    headline_low_femasafe_em:   "FEMA ak siyal lokal yo dakò",
+    headline_low_pre:           "Risk fèb",
+    section_before:    "Anvan ou siyen — sa pou verifye semèn sa a",
+    section_actions:   "Sa pou fè lè ou viv la",
+    section_insurance: "Opsyon asirans, an lang senp",
+    section_images:    "Sa nou te wè nan pwopriyete a",
+    section_gap:       "Poukisa kat inondasyon FEMA pa tout istwa a",
+    section_regional:  "Pi laj katye a — pi lwen pase inondasyon",
+    section_signals:   "Siyal brit nou te gade",
+    section_news:      "Nouvèl inondasyon lokal resan",
+    bottom_line_label: "Sa ki esansyèl",
+    bottom_line_sub:   "sa yon zanmi ki konnen inondasyon ta di ou",
+    synthesized_from:  "Konbine soti nan",
+    commercial_label:  "Pwopriyete komèsyal",
+    commercial_sub:    "konsèy pou pwopriyetè kay pa parèt",
+    commercial_body:   "FlutIQ fèt pou desizyon rezidansyèl — achte, lwe, oswa viv nan yon kay. Adrès sa a se yon pwopriyete komèsyal, kidonk plan aksyon pwopriyetè a, rekòmandasyon asirans yo, ak lis verifikasyon anvan-siyen yo kache. Konstata sou risk inondasyon, pwofil milti-danje, ak analiz vizyèl anba a toujou aplike pou bilding la. Pou desizyon kouvèti, pale ak yon koutye asirans komèsyal.",
+  },
+  ar: {
+    risk_low:                  "مخاطر منخفضة",
+    risk_medium:               "مخاطر متوسطة",
+    risk_high:                 "مخاطر مرتفعة",
+    headline_high_femasafe_pre: "مخاطر فيضان حضري مرتفعة —",
+    headline_high_femasafe_em:  "رغم أن FEMA تصنفها \"دنيا\"",
+    headline_high_pre:          "مخاطر فيضان مرتفعة —",
+    headline_high_em:           "FEMA تؤكد أنها منطقة خطر",
+    headline_med_femasafe_pre:  "مخاطر متوسطة لا تكتشفها FEMA —",
+    headline_med_femasafe_em:   "هناك مؤشرات فيضان حضري",
+    headline_med_pre:           "مخاطر فيضان متوسطة",
+    headline_low_femasafe_pre:  "مخاطر منخفضة في هذا الحي —",
+    headline_low_femasafe_em:   "FEMA والمؤشرات المحلية متفقة",
+    headline_low_pre:           "مخاطر منخفضة",
+    section_before:    "قبل التوقيع — ما يجب التحقق منه هذا الأسبوع",
+    section_actions:   "ما ينبغي فعله بعد السكن",
+    section_insurance: "خيارات التأمين، بلغة مبسطة",
+    section_images:    "ما رأيناه في العقار",
+    section_gap:       "لماذا لا تروي خريطة FEMA القصة كاملة",
+    section_regional:  "المنطقة الأوسع — أبعد من الفيضانات وحدها",
+    section_signals:   "المؤشرات الأولية التي فحصناها",
+    section_news:      "أخبار الفيضانات المحلية الأخيرة",
+    bottom_line_label: "الخلاصة",
+    bottom_line_sub:   "ما سيخبرك به صديق خبير بالفيضانات",
+    synthesized_from:  "مُجمَّع من",
+    commercial_label:  "عقار تجاري",
+    commercial_sub:    "لا تظهر نصائح المالكين",
+    commercial_body:   "تم تصميم FlutIQ للقرارات السكنية — الشراء أو الاستئجار أو السكن في منزل. تم التعرف على هذا العنوان كعقار تجاري، لذلك يتم إخفاء خطة العمل للمالك وتوصيات التأمين وقائمة التحقق قبل التوقيع. تبقى نتائج مخاطر الفيضانات وملف المخاطر المتعددة والتحليل البصري أدناه قابلة للتطبيق على المبنى. لقرارات التأمين، تحدث مع وسيط تأمين تجاري.",
+  },
+  tl: {
+    risk_low:                  "Mababang panganib",
+    risk_medium:               "Katamtamang panganib",
+    risk_high:                 "Mataas na panganib",
+    headline_high_femasafe_pre: "Mataas na panganib sa baha sa lungsod —",
+    headline_high_femasafe_em:  "kahit sinabi ng FEMA na \"minimal\"",
+    headline_high_pre:          "Mataas na panganib sa baha —",
+    headline_high_em:           "Kinumpirma ng FEMA bilang panganib na sona",
+    headline_med_femasafe_pre:  "Katamtamang panganib na hindi nakita ng FEMA —",
+    headline_med_femasafe_em:   "may mga senyales ng baha sa lungsod",
+    headline_med_pre:           "Katamtamang panganib sa baha",
+    headline_low_femasafe_pre:  "Mababang panganib sa block na ito —",
+    headline_low_femasafe_em:   "FEMA at lokal na senyales ay magkasundo",
+    headline_low_pre:           "Mababang panganib",
+    section_before:    "Bago pumirma — ano ang sisiyasatin ngayong linggo",
+    section_actions:   "Ano ang gagawin pagdating mo dito",
+    section_insurance: "Mga pagpipiliang insurance, sa simpleng salita",
+    section_images:    "Ang nakita namin sa ari-arian",
+    section_gap:       "Bakit hindi kabuuan ng kuwento ang flood map ng FEMA",
+    section_regional:  "Mas malawak na kapitbahayan — hindi lang baha",
+    section_signals:   "Ang mga raw signal na sinuri namin",
+    section_news:      "Mga kamakailang lokal na balita sa baha",
+    bottom_line_label: "Ang pangunahing punto",
+    bottom_line_sub:   "ang sasabihin sa iyo ng kaibigang sanay sa baha",
+    synthesized_from:  "Pinagsama-sama mula sa",
+    commercial_label:  "Komersyal na ari-arian",
+    commercial_sub:    "hindi ipinapakita ang payo para sa homeowner",
+    commercial_body:   "Ang FlutIQ ay ginawa para sa mga desisyong tirahan — pagbili, pag-arkila, o pagtira sa isang bahay. Ang address na ito ay natukoy bilang komersyal na ari-arian, kaya nakatago ang plano ng aksyon para sa homeowner, mga rekomendasyon sa insurance, at checklist bago pumirma. Ang mga natuklasang panganib sa baha, multi-hazard profile, at visual analysis sa ibaba ay nananatiling angkop sa gusali. Para sa mga desisyon sa coverage, kumonsulta sa isang komersyal na insurance broker.",
+  },
+};
+
+// Lookup helper: returns the translation, falling back to English, then to
+// the key itself if even English is missing (shouldn't happen, but safe).
+const tr = (lang, key) => {
+  const dict = UI_STRINGS[lang] || UI_STRINGS.en;
+  return dict[key] ?? UI_STRINGS.en[key] ?? key;
+};
+
 const useFloodAssessment = () => {
   const [agentState, setAgentState] = useState({});  // {fema: {status, summary}, ...}
   const [geocode, setGeocode] = useState(null);
@@ -1003,7 +1221,10 @@ const RiskCircle = ({ score }) => {
 
 // Map the live backend dossier shape onto the existing display shape.
 // Be defensive about missing fields — any individual agent could have errored.
-const mapDossier = (raw) => {
+// `lang` drives translation of the static headline templates; the dossier
+// PROSE (verdict, NRI narrative, vision findings) is already translated
+// server-side by the language directive.
+const mapDossier = (raw, lang = "en") => {
   if (!raw) return DOSSIER;
   const fema    = raw.fema    || {};
   const local   = raw.local   || {};
@@ -1019,20 +1240,21 @@ const mapDossier = (raw) => {
   const cum_pct = risk.mortgage_30yr_probability != null ? Math.round(risk.mortgage_30yr_probability * 100) : null;
 
   // Headline framing — the FEMA-gap thesis kicks in when FEMA says "safe"
-  // but the risk agent disagrees.
+  // but the risk agent disagrees. Both halves come from UI_STRINGS so the
+  // headline reads in the user's chosen language, not English.
   const femaSaysSafe = fema.is_sfha === false;
   const headline = (() => {
     if (level === "high" && femaSaysSafe)
-      return { pre: "High urban flood risk —", em: "despite FEMA saying \"minimal\"" };
+      return { pre: tr(lang, "headline_high_femasafe_pre"), em: tr(lang, "headline_high_femasafe_em") };
     if (level === "high")
-      return { pre: "High flood risk —", em: "FEMA confirms a hazard zone" };
+      return { pre: tr(lang, "headline_high_pre"),          em: tr(lang, "headline_high_em") };
     if (level === "medium" && femaSaysSafe)
-      return { pre: "Moderate risk that FEMA misses —", em: "urban flood signals are present" };
+      return { pre: tr(lang, "headline_med_femasafe_pre"),  em: tr(lang, "headline_med_femasafe_em") };
     if (level === "medium")
-      return { pre: "Moderate flood risk", em: "" };
+      return { pre: tr(lang, "headline_med_pre"),           em: "" };
     if (level === "low" && femaSaysSafe)
-      return { pre: "Low risk on this block —", em: "FEMA and local signals agree" };
-    return { pre: "Low risk", em: "" };
+      return { pre: tr(lang, "headline_low_femasafe_pre"),  em: tr(lang, "headline_low_femasafe_em") };
+    return { pre: tr(lang, "headline_low_pre"), em: "" };
   })();
 
   const tags = [];
@@ -1171,8 +1393,9 @@ const mapDossier = (raw) => {
   };
 };
 
-const DossierScreen = ({ onBack, dossier }) => {
-  const D = useMemo(() => mapDossier(dossier), [dossier]);
+const DossierScreen = ({ onBack, dossier, language = "en" }) => {
+  const D = useMemo(() => mapDossier(dossier, language), [dossier, language]);
+  const t = useCallback((key) => tr(language, key), [language]);
   const [showReasoning, setShowReasoning] = useState(false);
 
   // Section numbers depend on which conditional sections render. We
@@ -1214,7 +1437,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           <RiskCircle score={D.score}/>
           <div className="risk-meta">
             <span className={`risk-tag ${D.level === "high" ? "coral" : D.level === "medium" ? "amber" : "teal"}`}>
-              {D.level.charAt(0).toUpperCase() + D.level.slice(1)} risk · {D.score}/100
+              {t("risk_" + D.level)} · {D.score}/100
             </span>
             <h2 className="risk-headline">{D.headline_pre} {D.headline_em && <em>{D.headline_em}</em>}</h2>
             <div className="risk-addr">{D.address}</div>
@@ -1227,11 +1450,11 @@ const DossierScreen = ({ onBack, dossier }) => {
         {isCommercial && (
           <div style={{margin: "20px 0 14px", padding: "14px 16px 16px", background: "var(--surface)", border: "1px solid var(--line)", borderLeft: "4px solid var(--amber)", borderRadius: 12, boxShadow: "0 6px 16px rgba(22,22,22,0.04)"}}>
             <div style={{display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--amber)", marginBottom: 8}}>
-              <span>◆ Commercial property</span>
-              <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· homeowner advice not shown</span>
+              <span>◆ {t("commercial_label")}</span>
+              <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· {t("commercial_sub")}</span>
             </div>
             <p style={{margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--ink)"}}>
-              FlutIQ is built for residential decisions — buying, renting, or living in a home. This address resolved to a commercial property, so the homeowner action plan, insurance recommendations, and before-you-sign checklist are hidden. The flood risk findings, multi-hazard profile, and visual analysis below still apply to the building. For coverage decisions, talk to a commercial insurance broker.
+              {t("commercial_body")}
             </p>
           </div>
         )}
@@ -1239,8 +1462,8 @@ const DossierScreen = ({ onBack, dossier }) => {
         {!isCommercial && D.plain_verdict && (
           <div style={{margin: "20px 0 14px", padding: "16px 18px 18px", background: "var(--surface)", border: "1px solid var(--line)", borderLeft: "4px solid var(--accent)", borderRadius: 12, boxShadow: "0 6px 16px rgba(22,22,22,0.04)"}}>
             <div style={{display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 8}}>
-              <span>◆ Bottom line</span>
-              <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· what a flood-savvy friend would tell you</span>
+              <span>◆ {t("bottom_line_label")}</span>
+              <span style={{color: "var(--ink-4)", fontWeight: 400, textTransform: "none", letterSpacing: "0.02em"}}>· {t("bottom_line_sub")}</span>
             </div>
             <p style={{margin: 0, fontSize: 15, lineHeight: 1.6, color: "var(--ink)"}}>{D.plain_verdict}</p>
           </div>
@@ -1264,7 +1487,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           if (D.images_used?.length) items.push(`${D.images_used.length} image${D.images_used.length === 1 ? "" : "s"} (${D.images_used.join(" + ")})`);
           return (
             <div style={{margin: "0 0 22px", padding: "10px 14px", background: "var(--bg)", border: "1px dashed var(--line)", borderRadius: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--ink-3)", lineHeight: 1.7}}>
-              <span style={{color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 8}}>Synthesized from</span>
+              <span style={{color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 8}}>{t("synthesized_from")}</span>
               {items.join("  ·  ")}
             </div>
           );
@@ -1275,7 +1498,7 @@ const DossierScreen = ({ onBack, dossier }) => {
             num={_sectionNums.before}
             icon={<Icon name="search" color="var(--purple)" size={16}/>}
             iconBg="var(--purple-soft)"
-            title="Before you sign — what to verify this week"
+            title={t("section_before")}
             badge={<span className="risk-tag purple">due diligence</span>}>
             <p style={{color:"var(--ink-2)"}}>If you're considering a lease or a purchase, these are the things a flood-savvy buyer would check first. Each item points to the data layer that flagged it.</p>
             {D.before_you_move_in.map((b,i) => (
@@ -1296,7 +1519,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           num={_sectionNums.actions}
           icon={<Icon name="plus" color="var(--teal)" size={16}/>}
           iconBg="var(--teal-soft)"
-          title="What to do once you live there"
+          title={t("section_actions")}
           badge={<span className="risk-tag teal">personalized</span>}>
           <p style={{color:"var(--ink-2)"}}>Three ways to harden a property against urban flooding: get water <strong>away</strong> from the building, let it <strong>soak in</strong>, and <strong>block</strong> the rest from getting inside. Items below are sequenced cheapest-and-easiest first within each group.</p>
           {D.actions.length === 0 ? (
@@ -1344,7 +1567,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           num={_sectionNums.insurance}
           icon={<Icon name="dollar" color="var(--purple)" size={16}/>}
           iconBg="var(--purple-soft)"
-          title="Insurance options, in plain English"
+          title={t("section_insurance")}
           badge={<span className="risk-tag teal">verified products</span>}>
           {D.advisor_tldr && (
             <div style={{marginBottom: 14, padding: "12px 14px", background: "var(--teal-soft)", borderRadius: 10, fontSize: 14, color: "var(--ink)", lineHeight: 1.5}}>
@@ -1404,7 +1627,7 @@ const DossierScreen = ({ onBack, dossier }) => {
             num={_sectionNums.images || "§03"}
             icon={<Icon name="pin" color="var(--accent)" size={16}/>}
             iconBg="var(--accent-soft)"
-            title="What we saw at the property"
+            title={t("section_images")}
             badge={<span className="risk-tag purple">Gemma 4 vision</span>}>
             <div style={{display:"grid", gridTemplateColumns:"320px 1fr", gap:18, alignItems:"start"}}>
               <div>
@@ -1582,7 +1805,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           num={_sectionNums.gap}
           icon={<Icon name="warn" color="var(--coral)" size={16}/>}
           iconBg="var(--coral-soft)"
-          title="Why FEMA's flood map isn't the whole story"
+          title={t("section_gap")}
           badge={D.level === "low" ? null : <span className="risk-tag coral">FEMA may understate risk</span>}
           defaultOpen={false}>
           {D.fema_gap.body.map((p,i) => <p key={i}>{p}</p>)}
@@ -1722,7 +1945,7 @@ const DossierScreen = ({ onBack, dossier }) => {
             num={_sectionNums.regional}
             icon={<Icon name="warn" color="var(--purple)" size={16}/>}
             iconBg="var(--purple-soft)"
-            title="Wider neighborhood — beyond just flooding"
+            title={t("section_regional")}
             badge={<span className="risk-tag purple">FEMA NRI · county-level</span>}>
             <p style={{color:"var(--ink-2)", marginTop:0}}>
               FlutIQ is flood-focused, but your county faces other hazards too. This is FEMA's
@@ -1803,7 +2026,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           num={_sectionNums.signals}
           icon={<Icon name="drop" color="var(--accent)" size={16}/>}
           iconBg="var(--accent-soft)"
-          title="The raw signals we looked at"
+          title={t("section_signals")}
           defaultOpen={false}>
           {D.infra.map((s,i) => (
             <div key={i} className="stat-row">
@@ -1817,7 +2040,7 @@ const DossierScreen = ({ onBack, dossier }) => {
           num={_sectionNums.news}
           icon={<Icon name="news" color="var(--amber)" size={16}/>}
           iconBg="var(--amber-soft)"
-          title="Recent local flood news">
+          title={t("section_news")}>
           {D.news.length === 0 ? (
             <p style={{color:"var(--ink-3)"}}>No recent flood-related coverage surfaced for this area.</p>
           ) : D.news.map((n,i) => {
@@ -1922,7 +2145,7 @@ const App = () => {
       />
       {screen === "search"  && <SearchScreen onSubmit={handleSubmit}/>}
       {screen === "agents"  && <AgentsScreen address={address} language={language} dark={dark} onComplete={handleAgentsComplete} />}
-      {screen === "dossier" && <DossierScreen onBack={()=>setScreen("search")} dossier={liveDossier} />}
+      {screen === "dossier" && <DossierScreen onBack={()=>setScreen("search")} dossier={liveDossier} language={language} />}
     </>
   );
 };
