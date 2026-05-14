@@ -1053,8 +1053,8 @@ const SearchScreen = ({ onSubmit }) => {
         <details className="learn-more">
           <summary>How it works</summary>
           <div className="learn-body">
-            <p>Seven specialist agents query public datasets in parallel — FEMA flood zones, Chicago 311 reports, USGS stream gauges, NOAA forecasts, GDELT news — then synthesize a personalized dossier with insurance guidance and a prioritized action plan.</p>
-            <div className="learn-sources">FEMA NFHL · Chicago 311 · USGS · NOAA · Open-Meteo · GDELT · OpenFEMA</div>
+            <p>Nine specialist Gemma 4 agents query public datasets in parallel — FEMA flood zones and the county-level multi-hazard NRI, city 311 reports and building permits across five Tier-1 cities, USGS stream gauges, NOAA forecasts, GDELT news, plus dedicated vision agents that run Gemma 4 multimodal on a satellite view and a Street View photograph — then synthesize a personalized dossier with a verified-catalog insurance recommendation, a before-you-sign checklist, and a prioritized drainage / infiltration / barrier action plan, in your chosen language.</p>
+            <div className="learn-sources">FEMA NFHL · FEMA NRI · 5-city 311 + permits · USGS · NOAA · Open-Meteo · GDELT · Mapbox satellite · Google Street View</div>
           </div>
         </details>
       </div>
@@ -2058,7 +2058,7 @@ const DossierScreen = ({ onBack, dossier, language = "en" }) => {
         </Section>
 
         <div className="method-foot">
-          <strong>Methodology.</strong> Seven specialist agents run in parallel: FEMA NFHL for the official flood zone, USGS Water Services for the nearest stream gauge, NOAA NWS for the local forecast and active flood alerts, Open-Meteo for the 7-day flood and precipitation outlook, and GDELT for recent and 24-month flood news. In Chicago we also pull City of Chicago 311 water-in-basement and street-flooding reports within 500m / 5yr; other cities show <code>—</code> until a local 311 source is wired. A risk-analyst agent then synthesizes everything using Gemma 4 reasoning mode, computing AEP and cumulative 30-year probability with P = 1 − (1 − AEP)<sup>n</sup>. An advisor agent translates the risk into insurance and mitigation actions. All Gemma 4 calls go through the OpenRouter free tier; nothing about your address is stored.<br/>
+          <strong>Methodology.</strong> Nine specialist Gemma 4 agents run in parallel. The seven data agents pull from free public APIs — FEMA NFHL for the property-level flood zone, FEMA's National Risk Index (via the RAPT ArcGIS REST endpoint) for the county-level 18-hazard profile (wildfire, hurricane, tornado, earthquake, etc.), USGS Water Services for the nearest stream gauge, NOAA NWS for the local forecast and active flood alerts, Open-Meteo for the 7-day flood + precipitation outlook, and GDELT for 6-month and 24-month flood news. In five Tier-1 cities (Chicago, NYC, SF, LA, Austin) we also pull city-specific 311 reports and recent building permits as a leading indicator of impervious-surface change; other US addresses show <code>—</code> for those rows but still get full NRI + FEMA + vision coverage. Two dedicated Gemma 4 vision agents independently analyze a Mapbox satellite image (bird's-eye) and a Google Street View photograph (eye-level), each producing bounding-box detections of flood indicators. A risk-analyst agent then synthesizes everything in a single Gemma 4 reasoning-mode inference call — both raw images alongside the structured findings — computing AEP and cumulative 30-year probability with P = 1 − (1 − AEP)<sup>n</sup>. An advisor agent translates the risk into verified-catalog insurance options, a before-you-sign checklist, and a bucketed drainage / infiltration / barrier action plan, in the homeowner's chosen language. All Gemma 4 calls go through the OpenRouter free tier (or a local Ollama in Edge mode); nothing about your address is stored.<br/>
           <span className="small">This is not financial or insurance advice. Confirm specifics with a licensed broker before purchasing coverage.</span>
         </div>
       </div>
@@ -2072,7 +2072,7 @@ const Chrome = ({ screen, onJump, dark, onToggleDark, language, onLanguageChange
     <div className="wordmark" onClick={()=>onJump("search")} style={{cursor:"pointer"}}>
       <span className="glyph">F</span>
       <span>{BRAND_NAME}</span>
-      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.15 · beta</span>
+      <span style={{color:"var(--ink-4)",fontSize:12,marginLeft:8,fontFamily:"JetBrains Mono"}}>v0.15.4 · beta</span>
     </div>
     <div className="chrome-meta">
       <span className="pill static"><span className="dot"/>{BRAND_PILL}</span>
