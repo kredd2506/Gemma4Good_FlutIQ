@@ -142,23 +142,25 @@ IMPORTANT CONTEXT:
 - If there are many 311 flood reports but FEMA says "minimal risk", the FEMA designation is misleading
 - Chicago's sewer system overwhelms after ~0.67 inches of rain per hour
 
-Return a JSON object with:
+Return a JSON object with these fields, IN THIS ORDER:
 {{
   "risk_score": <0-100 integer>,
   "risk_level": "low" | "medium" | "high",
+  "plain_verdict": "<REQUIRED, NEVER EMPTY. The BOTTOM LINE for someone about to live/buy/rent here, as if you were the friend they texted who happens to be a flood expert. Second person, ~10th-grade reading level, ONE paragraph (3-5 sentences). Write the VALUE in the user's chosen output language (per the language directive in the system prompt) — do NOT default to English if another language was requested. The JSON key 'plain_verdict' itself stays English. Lead with the verdict in sentence 1, then the single most important reason, then the trend direction (improving / stable / worsening). Quantify where possible (probabilities, counts, dollar figures). Do not hedge; do not generate alarm; sound like an analyst, not a parent.>",
   "aep_estimate": <estimated annual exceedance probability as decimal, e.g. 0.04>,
   "mortgage_30yr_probability": <cumulative probability over 30 years, e.g. 0.68>,
-  "plain_verdict": "<the BOTTOM LINE for someone about to live/buy/rent here, written as if you were the friend they texted who happens to be a flood expert. Second person, plain English, ~10th-grade reading level, ONE paragraph (3-5 sentences). Lead with the verdict in the first sentence, then the single most important reason, then the trend direction (improving / stable / worsening) and why. Quantify where possible (probabilities, counts, dollar figures). Do not hedge unnecessarily and do not generate alarm; sound like an analyst, not a parent.>",
-  "fema_gap_explanation": "<2-3 sentences explaining if/why FEMA designation is misleading>",
-  "visual_corroboration": {"<2-3 sentences on what the photo confirms, contradicts, or adds beyond the data; '' if no image was provided>" if has_image else "''"},
-  "key_risk_factors": ["<ranked list of top risk factors>"],
-  "mitigating_factors": ["<factors that reduce risk>"],
-  "summary": "<1 sentence for the status feed>"
+  "fema_gap_explanation": "<2-3 sentences explaining if/why FEMA designation is misleading. Value in the user's chosen language.>",
+  "visual_corroboration": {"<2-3 sentences on what the photo confirms, contradicts, or adds beyond the data. Value in the user's chosen language. '' if no image was provided>" if has_image else "''"},
+  "key_risk_factors": ["<ranked list of top risk factors. Each entry in the user's chosen language.>"],
+  "mitigating_factors": ["<factors that reduce risk. Each entry in the user's chosen language.>"],
+  "summary": "<1 sentence for the status feed, in the user's chosen language.>"
 }}
 
 Think step by step. Integrate visual and data evidence. Reference the
 photo directly in your reasoning ("I can see ...", "The image shows ...")
-when relevant. Return ONLY the JSON object at the end."""
+when relevant. Generate plain_verdict early in the JSON object (it is
+the most prominent field on the dossier). Return ONLY the JSON object
+at the end."""
 
     # Build the user message content. Per Gemma 4 best practice,
     # image content parts go BEFORE the text part. Order matches the
