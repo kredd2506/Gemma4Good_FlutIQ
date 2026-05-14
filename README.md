@@ -11,7 +11,7 @@ might generate from outdated training data.
 
 🌊 **Live demo:** [kredd25-flutiq.hf.space](https://kredd25-flutiq.hf.space)
 &nbsp;·&nbsp;
-**Status:** v0.15 · beta
+**Status:** v0.15.2 · beta
 
 > **Mission:** reduce the complexity and scariness of insurance.
 > The technical pitch (FEMA-gap, multimodal Gemma 4, multi-agent
@@ -22,6 +22,20 @@ might generate from outdated training data.
 
 ## What's new since v0.7
 
+- 🏢 **Commercial property detection** (v0.15.2) — the geocoder reads
+  Nominatim's `class`/`type`/`name` metadata to classify a hit as
+  residential or commercial. When the address resolves to a commercial
+  building (an airport admin building, an office tower, a hospital),
+  the dossier shows an amber "Commercial property" banner and
+  *suppresses* the homeowner-specific sections — action plan,
+  insurance options, before-you-sign checklist. The flood risk
+  findings, multi-hazard NRI, and visual analysis still render
+  because the building still floods. FlutIQ stays honest about who
+  it's for: residential homeowners.
+- 🔧 **Synthesis-receipt field fix** (v0.15.1) — the "Synthesized
+  from…" strip was reading the wrong field name for building permits;
+  fixed so the densification number ("Permits · 89 / $190M / 3y")
+  surfaces reliably under the bottom-line verdict.
 - 🏠🌐 **Dual-mode: FlutIQ Cloud + FlutIQ Edge** (v0.15) — same code,
   same agents, same dossier, two LLM endpoints. **Cloud** runs Gemma 4
   31B via OpenRouter (the live HF demo). **Edge** runs Gemma 4 e4b
@@ -197,38 +211,60 @@ products than 20 plausible-looking guesses.
 
 ## What you see (the dossier)
 
-Sections, ordered for the mission (action first, math last). Section
-numbers are computed at render time based on which conditional sections
-have data:
+The dossier opens with a **risk score and headline**, then three
+header cards from the v0.15 reframe:
 
-1. **Start here — what to do this month.** Concrete, sequenced
-   cheapest-first. (open by default)
-2. **Insurance options, in plain English.** TLDR banner, verified
-   product cards with "what it covers," "what it *doesn't* cover,"
-   and "how to actually get it." Sorted: start here → also
-   consider → only if. (open by default)
-3. **What we saw at the property.** *(when Street View or satellite
+- A **bottom-line verdict** — what a flood-savvy friend would tell
+  you about this address in plain English, 3-5 sentences, leads with
+  the call and then the most important reason. (residential only)
+- A discreet **"Synthesized from …" receipt** strip listing the data
+  layers that fed the briefing (FEMA · 311 · Permits · NRI · USGS ·
+  NOAA · imagery). Quietly conveys the time-compression story.
+- For **commercial properties**: an amber **banner** explaining that
+  FlutIQ is built for homeowners and that the residential-specific
+  sections are intentionally suppressed below. (v0.15.2)
+
+Then the numbered sections, ordered for the mission (action first,
+math last). Numbers are computed at render time based on which
+conditional sections have data; residential-only sections are skipped
+entirely for commercial properties.
+
+1. **Before you sign — what to verify this week.** *(residential only;
+   when the advisor produced a checklist)* 3-5 concrete things a
+   flood-savvy buyer would check before signing a lease or closing
+   a sale. Each item tagged with a citation chip back to the data
+   layer that flagged it (FEMA, 311, Permits, City sewer, Satellite,
+   Street view, NRI, USGS/NOAA).
+2. **What to do once you live there.** *(residential only)* Concrete
+   physical mitigations bucketed *get water away / let it soak in /
+   block the rest*, sequenced cheapest-first within each group.
+   (open by default)
+3. **Insurance options, in plain English.** *(residential only)* TLDR
+   banner, verified product cards with "what it covers," "what it
+   *doesn't* cover," and "how to actually get it." Sorted: start
+   here → also consider → only if. (open by default)
+4. **What we saw at the property.** *(when Street View or satellite
    imagery has coverage)* Tabbed view of the actual images Gemma 4
    vision examined — Street level + Satellite. Each tab shows the
    image with **colored bounding boxes drawn around each indicator**
    the model identified, side-by-side with a numbered list of those
    indicators. Honest about confidence — won't fabricate features it
    can't see.
-4. **Why FEMA's flood map isn't the whole story.** AEP math, 30-year
+5. **Why FEMA's flood map isn't the whole story.** AEP math, 30-year
    cumulative probability, the multimodal-reasoning callout (image +
    data sources + chain-of-thought · one inference call), the
    development-pressure callout when permits are available, and the
    full Gemma 4 reasoning trace toggle. (closed by default — opt-in
    for the curious)
-5. **Wider neighborhood — beyond just flooding.** *(NEW in v0.14)*
-   FEMA National Risk Index multi-hazard profile for the property's
-   county: composite score + rating, top 5 hazards (wildfire,
-   hurricane, tornado, etc.), Social Vulnerability + Community
-   Resilience indices, and Gemma's interpretation of what genuinely
-   matters here. The signal that broadens FlutIQ from flood-only.
-6. **The raw signals we looked at.** Stream gauges, alerts, historical
+6. **Wider neighborhood — beyond just flooding.** FEMA National Risk
+   Index multi-hazard profile for the property's county: composite
+   score + rating, top 5 hazards (wildfire, hurricane, tornado, etc.),
+   Social Vulnerability + Community Resilience indices, and Gemma's
+   interpretation of what genuinely matters here. The signal that
+   broadens FlutIQ from flood-only.
+7. **The raw signals we looked at.** Stream gauges, alerts, historical
    events, FEMA panel. (closed by default)
-7. **Recent local flood news.**
+8. **Recent local flood news.**
 
 Plus a Leaflet map of the actual address with a 500m search-radius
 ring matching the agents' query parameters, and a language picker

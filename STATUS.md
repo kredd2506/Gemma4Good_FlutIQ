@@ -1,4 +1,4 @@
-# FlutIQ — current state (2026-05-07, v0.15)
+# FlutIQ — current state (2026-05-14, v0.15.2)
 
 A working snapshot of what's built, what wobbles, and what's left.
 This is a build journal, not a polished README — the README at the
@@ -178,7 +178,7 @@ The React app lives entirely in `backend/static/index.html`
 
 ---
 
-## Versions shipped (v0.7 → v0.15)
+## Versions shipped (v0.7 → v0.15.2)
 
 | Version | Highlight |
 |---|---|
@@ -192,6 +192,66 @@ The React app lives entirely in `backend/static/index.html`
 | **v0.14** | Regional risk agent — FEMA NRI multi-hazard at county level (all US counties) |
 | **v0.14.1** | System-prompt tuning for the 4-layer signal hierarchy (Property / Neighborhood / Visual / Regional) |
 | **v0.15** | Dual-mode (FlutIQ Cloud via OpenRouter + FlutIQ Edge via Ollama / Gemma 4 e4b on-device) + expert-briefing dossier reframe (`plain_verdict`, `before_you_move_in[]` with citations, mitigation_actions bucketed into drainage / infiltration / barrier, synthesis-receipt strip) |
+| **v0.15.1** | Synthesis-receipt field-name bug — was reading wrong key for building permits; permits row now reliably surfaces in the receipt strip |
+| **v0.15.2** | Commercial property detection — geocoder classifies Nominatim hits residential/commercial; advisor early-returns for commercial; dossier hides homeowner-only sections + shows an amber banner. Chips re-curated to drop any commercial buildings (Empire State Bldg, LAX admin) |
+
+---
+
+## v0.15.2 — what shipped this round
+
+**Commercial property detection:**
+- A user clicked the LA chip and got residential-flavored insurance
+  advice for the **Clifton A. Moore Administration Building at LAX** —
+  the building has a name, it's clearly commercial, and FlutIQ was
+  still producing a "For this property…" homeowner insurance pitch
+  and an action plan. Root cause: property type wasn't surfaced
+  anywhere; advisor was hardcoded residential.
+- Fix went with the on-brand path (FlutIQ's mission is homeowners,
+  not commercial coverage):
+  - `geocoder.py` now classifies Nominatim hits as `residential` or
+    `commercial` using `class` / `type` / `name` heuristics. Defaults
+    to residential unless the signal is confident (osm `class` ∈
+    {amenity, tourism, shop, office, industrial, …}, `type` in a
+    closed institutional set, or `class=building` with a real `name`).
+    Census fallback assumes residential (TIGER street addresses).
+  - `advisor_agent.py` short-circuits for commercial — skips the
+    Gemma 4 call entirely and returns a graceful note pointing the
+    user to a commercial insurance broker.
+  - `index.html` reads `property_type` from the dossier, renders an
+    amber **"Commercial property"** banner near the top, and
+    suppresses the Before-you-sign / Actions / Insurance sections.
+    Dynamic section numbering adjusts; the FEMA-gap, NRI, vision,
+    and signals sections still render because the building still
+    floods.
+- Verified live against real Nominatim API:
+  `1 World Way` (LAX) → commercial · `350 5th Ave` (Empire State Bldg)
+  → commercial · `4521 S Drexel Blvd`, `Echo Park`, `Greenwich Village`,
+  `Houston Heights` → residential.
+
+**Example chips re-curated:**
+- Initial chip pick included LAX (1 World Way) and the Empire State
+  Building (350 5th Ave) — both correctly flagged by the new
+  classifier as commercial, both defeating their chips' demo purpose
+  of showing the full pipeline. Swapped to neighborhood-level
+  residential anchors that still resolve to the Tier-1 city for
+  full 311 + permits coverage:
+  - **Chicago** — 4521 S Drexel Blvd (full Tier-1 + FEMA-gap drama)
+  - **NYC** — Greenwich Village (full Tier-1 + CSO/sewer story)
+  - **LA** — Echo Park (full Tier-1 + NRI wildfire + earthquake VH)
+  - **Houston** — Houston Heights (outside Tier-1, NRI hurricane)
+
+---
+
+## v0.15.1 — quick fix
+
+The synthesis-receipt strip (`Synthesized from …`) was reading
+`D.local?.permits` for the permits row. The actual advisor-output
+shape nested permits under `D.local?.construction.permits_count` /
+`construction.total_reported_cost`. Result: the strip always rendered
+without the permits row even on Chicago test addresses with 89
+permits and $190M in reported costs. One-character fix landed same
+day; permits row now reliably appears on densification-pressure
+addresses.
 
 ---
 
@@ -269,6 +329,12 @@ Useful for the writeup ("what we learned implementing the spec / live data"):
 ## Known limitations
 
 ### What works but is scoped down
+- **Residential properties only** for insurance + homeowner-action
+  advice (v0.15.2). Commercial addresses still get the FEMA / NRI /
+  vision / signals analysis but the dossier suppresses the action
+  plan, insurance, and before-you-sign sections with an honest
+  banner pointing the user to a commercial broker. Catalog is
+  homeowner-focused on purpose.
 - **Local 311 + permits = 5 cities** (Chicago, NYC, SF, LA, Austin).
   Each new city = one registry entry plus per-city flood-category mapping.
   NRI multi-hazard works for all US counties; only the city-specific
@@ -394,6 +460,11 @@ The default `:free` tier is a shared upstream pool that 429s after
 ## Recent commit log
 
 ```
+375b426  v0.15.2: detect commercial properties, skip homeowner advice
+ebdb8cb  frontend: rotate example chips for broader story coverage
+207f884  v0.15.1: synthesis-strip permits bug — wrong field name
+2d5598f  v0.15: dual-mode (Cloud + Edge) + expert-briefing dossier reframe
+ad1f6d6  STATUS: refresh from May-2-v0.7 snapshot to May-6-v0.14.1 reality
 a0a8697  README: refresh from v0.7 → v0.14.1
 a201ec0  v0.14.1: tune three system prompts for layered signals
 d4bd648  v0.14: regional_risk_agent — FEMA NRI multi-hazard
