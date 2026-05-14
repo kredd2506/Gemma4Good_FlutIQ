@@ -208,6 +208,11 @@
   .hiw-trust-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-4); display: block; margin-bottom: 10px; }
   .hiw-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   .hiw-pill { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 10px; border: 0.5px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink-3); }
+  /* Edge note: subtle below-trust-bar callout. Smaller than the Cloud-focused step cards
+     on purpose — FlutIQ Cloud is the hero; Edge is the privacy/local-frontier secondary. */
+  .hiw-edge-note { margin: 24px auto 0; padding: 14px 18px; border: 0.5px dashed var(--line); border-radius: 12px; max-width: 520px; text-align: center; }
+  .hiw-edge-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-4); display: block; margin-bottom: 8px; }
+  .hiw-edge-detail { font-size: 13px; line-height: 1.55; color: var(--ink-3); margin: 0; }
 
   .agents-grid {
     flex: 1;
@@ -1106,6 +1111,11 @@ const SearchScreen = ({ onSubmit }) => {
               <span className="hiw-pill">Mapbox Satellite</span>
               <span className="hiw-pill">Street View</span>
             </div>
+          </div>
+
+          <div className="hiw-edge-note">
+            <span className="hiw-edge-label">FlutIQ Edge · also runs offline</span>
+            <p className="hiw-edge-detail">The same agents and dossier can run locally on a laptop via Ollama with Gemma 4 e4b on-device. No API key, no internet for inference — the address never leaves your device.</p>
           </div>
         </section>
       </div>
@@ -2159,7 +2169,14 @@ const App = () => {
   const [screen, setScreen] = useState("search");
   const [address, setAddress] = useState("");
   const [liveDossier, setLiveDossier] = useState(null);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => {
+    // Dark by default for first-time visitors; respect saved preference for returners.
+    try {
+      const stored = localStorage.getItem("flutiq.dark");
+      if (stored === null) return true;
+      return stored === "true";
+    } catch { return true; }
+  });
   const [language, setLanguage] = useState(() => {
     try { return localStorage.getItem("flutiq.language") || "en"; }
     catch { return "en"; }
@@ -2167,6 +2184,7 @@ const App = () => {
 
   useEffect(() => {
     document.body.classList.toggle("dark", dark);
+    try { localStorage.setItem("flutiq.dark", String(dark)); } catch {}
   }, [dark]);
 
   useEffect(() => {
