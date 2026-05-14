@@ -1,4 +1,4 @@
-# FlutIQ — current state (2026-05-14, v0.15.2)
+# FlutIQ — current state (2026-05-14, v0.15.4)
 
 A working snapshot of what's built, what wobbles, and what's left.
 This is a build journal, not a polished README — the README at the
@@ -178,7 +178,7 @@ The React app lives entirely in `backend/static/index.html`
 
 ---
 
-## Versions shipped (v0.7 → v0.15.2)
+## Versions shipped (v0.7 → v0.15.4)
 
 | Version | Highlight |
 |---|---|
@@ -194,6 +194,132 @@ The React app lives entirely in `backend/static/index.html`
 | **v0.15** | Dual-mode (FlutIQ Cloud via OpenRouter + FlutIQ Edge via Ollama / Gemma 4 e4b on-device) + expert-briefing dossier reframe (`plain_verdict`, `before_you_move_in[]` with citations, mitigation_actions bucketed into drainage / infiltration / barrier, synthesis-receipt strip) |
 | **v0.15.1** | Synthesis-receipt field-name bug — was reading wrong key for building permits; permits row now reliably surfaces in the receipt strip |
 | **v0.15.2** | Commercial property detection — geocoder classifies Nominatim hits residential/commercial; advisor early-returns for commercial; dossier hides homeowner-only sections + shows an amber banner. Chips re-curated to drop any commercial buildings (Empire State Bldg, LAX admin) |
+| **v0.15.3** | Non-English dossiers were patchy on two distinct axes: (a) Tier-1 BUG — Gemma 4 translated enum values like `product_id` and `bucket`, the strict post-parse filter silently dropped every recommendation, insurance + actions came back empty; (b) UI chrome (risk-tag, headline, section titles, banners) was hardcoded English with no translation path. Fix: strengthened language directive + advisor prompt to lock enum values to English; new `UI_STRINGS` dict in `index.html` covers ~27 keys × 7 languages with a `tr(lang, key)` helper threaded through `mapDossier` and `DossierScreen` |
+| **v0.15.4** | After v0.15.3, end-to-end testing of all 7 languages live against the HF Space caught one remaining gap: `risk_agent.plain_verdict` rendered empty for `zh` + `ar` (the two non-Latin scripts). The field's instruction had "Second person, plain English, ~10th-grade reading level" — "plain English" contradicted the language directive on non-Latin output. Fix: rewrite the field as REQUIRED + explicit "write the VALUE in the user's chosen language", reorder it to position 3 in the JSON schema for token-budget safety, and extend the explicit language-target reminder to all other string-valued risk fields. All 7 languages now verified end-to-end. |
+
+---
+
+## v0.15.4 — what shipped this round
+
+End-to-end live testing of all 7 dossier languages exposed one final
+language-related bug. Five rounds in, the non-English code path is
+now genuinely verified, not just "the prompt directive is wired."
+
+**The hunt:**
+- Ran `flutiq_lang_test.py` against the deployed Space — POST
+  `/api/assess` with the same Chicago address (`4521 S Drexel Blvd`)
+  and `language` ∈ {en, es, zh, vi, ht, ar, tl}, then parsed the
+  final `complete` SSE event's dossier payload.
+- For each language we checked: insurance count, mitigation count,
+  before_you_move_in count, `advisor.tldr` quality, `risk.plain_verdict`
+  quality. Total ~9 LLM calls × 7 languages ≈ 63 calls, serialized
+  to stay under upstream BYOK rate limits.
+- Tier-1 fix (v0.15.3) confirmed working for **all 7**: every
+  language returned 2 insurance recommendations with the correct
+  English `product_id`s (`homeowners_sewer_rider`, `nfip_standard`)
+  and 3 mitigation actions across all three buckets (`barrier`,
+  `drainage`, `infiltration`).
+- `advisor.tldr` rendered fluent target-language prose in all 7,
+  including the lower-resource Haitian Creole and Tagalog (the
+  latter with appropriate English code-switching, which is natural
+  in Filipino usage).
+
+**The bug:**
+- `risk.plain_verdict` came back EMPTY for `zh` and `ar` — and ONLY
+  those two. Every other risk-agent field (`risk_score`, `risk_level`,
+  `fema_gap_explanation`, etc.) populated normally. The pattern
+  cleanly localized to non-Latin-script languages.
+- Root cause: the field instruction said "Second person, plain English,
+  ~10th-grade reading level" — when the system-prompt language
+  directive says "write in Mandarin / Arabic", the model received
+  contradictory signals about what language to use for THIS specific
+  field. Latin-script languages somehow tolerated the conflict
+  (Spanish + Vietnamese + Haitian Creole + Tagalog all populated);
+  non-Latin scripts didn't.
+
+**Fix in `risk_agent.py`:**
+- Drop "plain English" from the `plain_verdict` instruction. Replace
+  with explicit "Write the VALUE in the user's chosen output language
+  (per the language directive in the system prompt) — do NOT default
+  to English if another language was requested. The JSON key
+  'plain_verdict' itself stays English."
+- Mark the field `REQUIRED, NEVER EMPTY`; add a closing reminder at
+  the bottom of the prompt: "Generate `plain_verdict` early in the
+  JSON object (it is the most prominent field on the dossier)."
+- Reorder the JSON schema so `plain_verdict` is field 3 (right after
+  `risk_score` and `risk_level`). Token-budget safety: reasoning
+  mode produces a long CoT trace; if the trailing JSON ever truncates,
+  the user still gets the headline verdict.
+- Extend the "value in user's chosen language" reminder to
+  `fema_gap_explanation`, `visual_corroboration`, `key_risk_factors`,
+  `mitigating_factors`, `summary` — same class of risk, fix once.
+
+**Verification:**
+- Re-tested `zh` and `ar` against the same address after deploy.
+  `plain_verdict` came back at 171 chars (zh) and 336 chars (ar),
+  both fluent and substantive (mentioned FEMA Zone X, the
+  densification leading indicator, and the 26%/21% 30-year cumulative
+  probability). `fema_gap_explanation` and `visual_corroboration`
+  also now fluent in the target languages.
+
+---
+
+## v0.15.3 — what shipped this round
+
+Hand-testing the Spanish dossier on the Chicago Drexel address
+surfaced two distinct failures the original "translate everything"
+prompt directive caused.
+
+**Tier-1 bug — empty advisor sections:**
+- Gemma 4 in Spanish mode helpfully translated the technical enum
+  values inside the JSON it returned: `"nfip_standard"` became
+  `"nfip_estandar"`, bucket `"drainage"` became `"drenaje"`. The
+  strict post-parse filter in `advisor_agent.py` then silently
+  dropped every `insurance_recommendations` entry (none matched a
+  catalog `product_id`), and the bucket-grouped renderer collapsed
+  every `mitigation_actions` entry into the "other" bucket (or the
+  model emitted an empty array — same observable outcome).
+- The dossier rendered with "The advisor agent did not return
+  insurance recommendations for this address" and only the
+  forced-passthrough city resources in the action plan. Functionally
+  broken Spanish.
+
+**Tier-1 fix — strict enum preservation:**
+- `languages.py` directive now explicitly enumerates the enum /
+  identifier values that must NOT be translated (`product_id`,
+  `bucket`, `cite`, `priority`, `effort`, `impact`) with concrete
+  examples, AND explains *why* (silent parser drops).
+- `advisor_agent.py` repeats the same enum list in the CRITICAL block
+  at the bottom of the user prompt — adjacent to the catalog, so
+  the constraint is in context when the model is actually generating
+  the IDs.
+
+**Tier-2 polish — frontend i18n:**
+- Until this round, only model-generated prose was translated; the
+  React JSX chrome (risk-tag, bold headline, every section title,
+  Bottom-Line / Synthesized-From / Commercial banner labels) was
+  hardcoded English. Read jarringly mixed-language for Spanish.
+- New `UI_STRINGS` dict at the top of `index.html` covers ~27 keys
+  × 7 languages: risk-level labels (3), risk headlines (10 across
+  6 cases), section titles (8), bottom-line + receipt labels (3),
+  commercial banner label + sub + body (3).
+- New `tr(lang, key)` helper with English fallback. `mapDossier`
+  now takes `lang` and emits translated headline templates;
+  `DossierScreen` now takes `language` prop and builds a
+  closure-bound `t(key)` for chrome translations; `App` passes
+  the active picker language through.
+- Translations: Spanish hand-written carefully. The other six
+  (Mandarin, Vietnamese, Haitian Creole, Arabic, Tagalog) written
+  to the best of multilingual capability — should be reviewed by
+  native speakers before production, but ship-ready for hackathon
+  submission.
+
+**Intentionally NOT in this round:**
+- Methodology footer, disclaimer, severity chips on indicators
+  (`moderate`, `low`, `high`), the "FEMA may understate risk" badge,
+  visual-risk readouts (`VISUAL RISK`, `AT GRADE`, `CONFIDENCE`),
+  toolbar (`DOSSIER · DATE · v1`). All still English. Documented
+  as a known scoped-down item; can land in a follow-up pass.
 
 ---
 
@@ -335,6 +461,17 @@ Useful for the writeup ("what we learned implementing the spec / live data"):
   plan, insurance, and before-you-sign sections with an honest
   banner pointing the user to a commercial broker. Catalog is
   homeowner-focused on purpose.
+- **Partial UI translation** (v0.15.3 / v0.15.4). Body prose
+  (bottom-line verdict, NRI narrative, vision findings, action
+  descriptions, advisor TLDR), risk-tag, hero headline, all 8
+  section titles, and the commercial banner are translated across
+  all 7 languages. **Not yet translated**: methodology footer,
+  disclaimer, severity chips on indicators ("moderate" / "low" /
+  "high"), the "FEMA may understate risk" badge, visual-risk
+  readouts ("VISUAL RISK", "AT GRADE", "CONFIDENCE"), the toolbar
+  ("DOSSIER · DATE · v1"). Documented as a follow-up; non-English
+  translations should also be reviewed by native speakers before
+  any production deploy.
 - **Local 311 + permits = 5 cities** (Chicago, NYC, SF, LA, Austin).
   Each new city = one registry entry plus per-city flood-category mapping.
   NRI multi-hazard works for all US counties; only the city-specific
@@ -400,7 +537,9 @@ multimodal vision, bbox detection) is shipped.
 [x] Native bounding-box detection (yxyx normalized 0-1000 — verified)
 [x] Interleaved multimodal reasoning (2 images + 7 data in one call)
 [x] Long context (256K — comfortably handles the bundled prompt)
-[x] 140+ language support (7 languages live, prompt directive)
+[x] 140+ language support (7 languages live, verified end-to-end
+    against the deployed Space — all populate insurance, actions,
+    and a fluent bottom-line verdict in the target language)
 [x] Multi-hazard awareness (NRI: wildfire, hurricane, tornado, etc.)
 [x] Agentic workflows (9 agents, parallel-then-sequential, SSE)
 [x] Real-world problem (flood-risk communication gap, well-documented)
@@ -460,6 +599,9 @@ The default `:free` tier is a shared upstream pool that 429s after
 ## Recent commit log
 
 ```
+147b9e6  v0.15.4: risk_agent plain_verdict empty for zh + ar — language fix
+0565e0d  v0.15.3: make non-English dossiers actually work end-to-end
+c874de0  docs: refresh README + STATUS for v0.15.1 + v0.15.2
 375b426  v0.15.2: detect commercial properties, skip homeowner advice
 ebdb8cb  frontend: rotate example chips for broader story coverage
 207f884  v0.15.1: synthesis-strip permits bug — wrong field name

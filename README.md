@@ -11,7 +11,7 @@ might generate from outdated training data.
 
 🌊 **Live demo:** [kredd25-flutiq.hf.space](https://kredd25-flutiq.hf.space)
 &nbsp;·&nbsp;
-**Status:** v0.15.2 · beta
+**Status:** v0.15.4 · beta
 
 > **Mission:** reduce the complexity and scariness of insurance.
 > The technical pitch (FEMA-gap, multimodal Gemma 4, multi-agent
@@ -22,6 +22,40 @@ might generate from outdated training data.
 
 ## What's new since v0.7
 
+- 🌐 **Multi-language end-to-end verification** (v0.15.4) — all 7
+  languages (English, Spanish, Mandarin, Vietnamese, Haitian Creole,
+  Arabic, Tagalog) tested live against the deployed Space using the
+  same Chicago address. Every language now returns: a fluent
+  target-language bottom-line verdict, a populated insurance
+  recommendation set, a complete drainage/infiltration/barrier action
+  plan, and a populated before-you-sign checklist. Two prompt
+  hardenings landed in this round:
+  - `risk_agent` was emitting an empty `plain_verdict` for Mandarin
+    and Arabic specifically — the field's instruction said "plain
+    English" which contradicted the language directive on non-Latin
+    scripts. Rewrote the field as "REQUIRED, write the VALUE in the
+    user's chosen language", reordered it earlier in the JSON schema,
+    and extended the same explicit reminder to `fema_gap_explanation`,
+    `visual_corroboration`, `key_risk_factors`, `mitigating_factors`,
+    and `summary`.
+  - The earlier (v0.15.3) Tier-1 fix is what made any of that work:
+    Gemma 4 was helpfully translating *every* JSON value in
+    non-English mode, including technical identifiers like
+    `product_id` ("nfip_standard" → "nfip_estandar") and `bucket`
+    enums ("drainage" → "drenaje"). The strict post-parse filter
+    silently dropped every entry whose `product_id` didn't match
+    the catalog, leaving the insurance section blank.
+- 🗣️ **Translated UI chrome + advisor bug fix** (v0.15.3) — until this
+  round, only the model-generated *prose* was translated; the React
+  JSX chrome (the risk-tag, the bold headline, every section title,
+  the "Bottom line" and "Synthesized from" labels, the commercial
+  banner) stayed hardcoded English. Added a `UI_STRINGS` dict with
+  ~27 keys × 7 languages and threaded the active language through
+  `mapDossier` (for headline templates) and `DossierScreen` (for
+  chrome). Same round strengthened the prompt directive to lock
+  `product_id` / `bucket` / `cite` / `priority` / `effort` / `impact`
+  enum values to English so the strict post-parse filter stops
+  silently dropping translated entries.
 - 🏢 **Commercial property detection** (v0.15.2) — the geocoder reads
   Nominatim's `class`/`type`/`name` metadata to classify a hit as
   residential or commercial. When the address resolves to a commercial
